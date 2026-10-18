@@ -1,0 +1,41 @@
+# Gitee Go 流水线：push 到 master 时安装依赖、跑全量测试，并把 dist 存为制品
+#
+# 重要前提：Gitee Go 必须在仓库「DevOps / 流水线」页面开通后才会读取本文件，
+# 仅把 YAML 提交上来不会自动生效。
+#
+# 两点与 GitHub Actions 的差异：
+#   1. Gitee Go 的 Node 版本列表与 GitHub 不完全一致。若构建日志提示 22 不可用，
+#      把 inputs.nodeVersion 改成环境支持的版本（如 18 / 20）即可。
+#   2. 这里不跑 gitleaks——需要到 GitHub 下载二进制，Gitee Go 环境访问境外网络
+#      不稳定，容易让流水线因网络而非代码失败。密钥扫描放在 GitHub Actions 那一侧。
+version: '1.0'
+name: totp-web-ci
+displayName: TOTP-Web 构建与测试
+triggers:
+  trigger: auto
+  push:
+    branches:
+      precise:
+        - master
+stages:
+  - stage:
+      name: build-test
+      displayName: 安装依赖并测试
+      strategy: naturally
+      trigger: auto
+      steps:
+        - step: npmbuild@1
+          name: npm-build-test
+          displayName: npm 安装与测试
+          inputs:
+            nodeVersion: 22
+            goals: |
+              node -v
+              npm -v
+              npm ci
+              npm test
+            uploadArtifact: true
+            uploadArtifactOptions:
+              artifactPath: './dist'
+              artifactRepository: 'gitee-go'
+              artifactName: 'totp-web-dist'
