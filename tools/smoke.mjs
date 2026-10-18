@@ -30,6 +30,8 @@ const dom = new JSDOM(html, {
   pretendToBeVisual: true,
   beforeParse(window) {
     Object.defineProperty(window, 'crypto', { value: webcrypto, configurable: true });
+    // jsdom 的 navigator.language 是 en-US，会命中英文检测；这里强制中文以保证文案断言稳定
+    window.localStorage.setItem('totp-web-locale', 'zh');
     Object.defineProperty(window.navigator, 'clipboard', {
       value: { writeText: (t) => { clipboardWrites.push(String(t)); return Promise.resolve(); } },
       configurable: true,
@@ -142,6 +144,8 @@ const domF = new JSDOM(html, {
     Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
     w.TextEncoder = TextEncoder;
     w.TextDecoder = TextDecoder;
+    // 同上：jsdom navigator.language=en-US，强制中文
+    w.localStorage.setItem('totp-web-locale', 'zh');
     w.confirm = () => true;
     w.HTMLCanvasElement.prototype.getContext = () => null;
     w.localStorage.setItem('totp-web-accounts-v1', JSON.stringify({ v: 2, mode: 'plain', accounts: [] }));
@@ -281,6 +285,8 @@ const dom3 = new JSDOM(html, {
     Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
     w.TextEncoder = TextEncoder;
     w.TextDecoder = TextDecoder;
+    // 同上：jsdom navigator.language=en-US，强制中文
+    w.localStorage.setItem('totp-web-locale', 'zh');
     w.localStorage.setItem(STORE_KEY, storedEnc);
     w.confirm = () => true;
     w.HTMLCanvasElement.prototype.getContext = () => null;
@@ -315,6 +321,8 @@ const dom2 = new JSDOM(html, {
     Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
     w.TextEncoder = TextEncoder;
     w.TextDecoder = TextDecoder;
+    // 同上：jsdom navigator.language=en-US，强制中文
+    w.localStorage.setItem('totp-web-locale', 'zh');
     // 模拟窄屏：所有媒体查询命中
     w.matchMedia = () => ({ matches: true, media: '', onchange: null,
       addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent() { return false; } });
@@ -355,7 +363,9 @@ for (const chunk of htmlChunks) {
 check('HTML 模板插值均经 escapeHtml', bareVars.length === 0, bareVars.join(', '));
 check('确有多个 HTML 模板块被检查', htmlChunks.length >= 2, String(htmlChunks.length));
 check('扫码结果写入用 value/textContent 而非 innerHTML', !/\.innerHTML *= *text/.test(appSrc));
-check('复制迁移链接时提示含 Secret', /内含 Secret/.test(appSrc));
+// 文案已外置到语言包：既要有中文原文（在 html 内联的 zh 包里），也要确认代码用的是词条 key
+// 引号用 ['"] 兼容默认版与压缩版（terser 会把单引号统一成双引号）
+check('复制迁移链接时提示含 Secret', /内含 Secret/.test(html) && /t\(['"]toast\.linkCopied['"]/.test(appSrc));
 
 /* --- 13. 二维码识别：jsQR 兜底（桌面 Firefox/Chrome 无 BarcodeDetector） --- */
 check('页面内联 jsQR 已就绪', typeof window.jsQR === 'function', typeof window.jsQR);
@@ -378,6 +388,8 @@ const dom0 = new JSDOM(html, {
     Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
     w.TextEncoder = TextEncoder;
     w.TextDecoder = TextDecoder;
+    // 同上：jsdom navigator.language=en-US，强制中文
+    w.localStorage.setItem('totp-web-locale', 'zh');
     w.confirm = () => true;
     w.HTMLCanvasElement.prototype.getContext = () => null;
     // 全新用户：localStorage 完全为空
@@ -436,6 +448,101 @@ await sleep(200);
 check('清除后回到强制引导', !g0('onboard-panel').classList.contains('hidden'));
 check('清除后存储为空', dom0.window.localStorage.getItem(STORE_KEY) === null);
 dom0.window.close();
+
+/* --- 15. 国际化 i18n：切换 / 持久化 / 语言包与源码解耦 --- */
+check('默认中文：主标题为「TOTP 动态口令」', doc.querySelector('h1').textContent === 'TOTP 动态口令', doc.querySelector('h1').textContent);
+check('存在语言切换按钮', !!$('btn-lang'));
+
+$('btn-lang').click();
+await sleep(150);
+check('切英文后主标题变英文', doc.querySelector('h1').textContent === 'TOTP Authenticator', doc.querySelector('h1').textContent);
+check('切英文后按钮变为「中文」', $('btn-lang').textContent === '中文', $('btn-lang').textContent);
+check('切英文已持久化到 localStorage', window.localStorage.getItem('totp-web-locale') === 'en', String(window.localStorage.getItem('totp-web-locale')));
+check('切英文后安全提示为英文', /Security note|No accounts|master password/i.test($('sec-note').textContent), $('sec-note').textContent.slice(0, 50));
+
+// 切到英文后不应残留中文：可见文本节点 + title/placeholder（跳过 script/style，它们的中文只是注释）
+function collectText(node, out){
+  if (node.nodeType === 3){ out.push(node.nodeValue); return out; }
+  if (node.nodeType !== 1) return out;
+  const tag = String(node.tagName || '').toUpperCase();
+  if (tag === 'SCRIPT' || tag === 'STYLE') return out;
+  // 语言切换按钮的文案本身就是「另一种语言的名称」，不参与残留检查
+  if (node.getAttribute && node.getAttribute('id') === 'btn-lang') return out;
+  const attrs = [];
+  for (const a of ['title', 'placeholder', 'aria-label']){
+    const v = node.getAttribute(a);
+    if (v) attrs.push(v);
+  }
+  if (attrs.length) out.push(attrs.join(' '));
+  for (const c of node.childNodes) collectText(c, out);
+  return out;
+}
+const zhLeftover = collectText(doc.body, [])
+  .map((s) => String(s).trim())
+  .filter((s) => s && /[\u4e00-\u9fff]/.test(s))
+  .map((s) => s.slice(0, 40));
+check('切英文后无中文残留（含 title/placeholder）', zhLeftover.length === 0, zhLeftover.slice(0, 6).join(' | '));
+
+$('btn-lang').click();
+await sleep(150);
+check('切回中文后主标题复原', doc.querySelector('h1').textContent === 'TOTP 动态口令', doc.querySelector('h1').textContent);
+check('切回中文已持久化', window.localStorage.getItem('totp-web-locale') === 'zh', String(window.localStorage.getItem('totp-web-locale')));
+
+// 语言包与源码解耦：源码只留占位，词条放在 src/i18n/<lang>.js
+const srcHtml = readFileSync(join(root, 'index.html'), 'utf8');
+check('源码不含词条、只留占位', !/'app\.title'\s*:/.test(srcHtml) && srcHtml.includes('__I18N_PACKS__'));
+let zhPack = '', enPack = '';
+try { zhPack = readFileSync(join(root, 'src', 'i18n', 'zh.js'), 'utf8'); } catch (e) { zhPack = ''; }
+try { enPack = readFileSync(join(root, 'src', 'i18n', 'en.js'), 'utf8'); } catch (e) { enPack = ''; }
+const hasKey = (s, k) => new RegExp("['\"]" + k.replace(/\./g, '\\.') + "['\"]\\s*:").test(s);
+check('语言包 zh.js / en.js 独立存在', hasKey(zhPack, 'app.title') && hasKey(enPack, 'app.title'));
+check('产物已内联词条且无占位残留', hasKey(html, 'app.title') && !html.includes('__I18N_PACKS__'));
+
+/* --- 16. 语言自动检测：没有历史选择时按浏览器语言决定（jsdom navigator.language = en-US） --- */
+const domDetect = new JSDOM(html, {
+  runScripts: 'dangerously',
+  url: 'http://localhost/',
+  pretendToBeVisual: true,
+  beforeParse(w) {
+    Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
+    w.TextEncoder = TextEncoder;
+    w.TextDecoder = TextDecoder;
+    w.confirm = () => true;
+    w.HTMLCanvasElement.prototype.getContext = () => null;
+    // 注意：这里刻意不写 totp-web-locale，用于验证自动检测
+  },
+});
+await sleep(150);
+const docAuto = domDetect.window.document;
+check('未手动选择时按浏览器语言自动显示英文', docAuto.querySelector('h1').textContent === 'TOTP Authenticator', docAuto.querySelector('h1').textContent);
+check('自动检测不落盘（只有手动切换才记忆）', domDetect.window.localStorage.getItem('totp-web-locale') === null, String(domDetect.window.localStorage.getItem('totp-web-locale')));
+check('自动检测时 <html lang> 同步为 en', docAuto.documentElement.getAttribute('lang') === 'en', String(docAuto.documentElement.getAttribute('lang')));
+domDetect.window.close();
+
+/* --- 17. 文档双语：README.md（中文）与 README.en.md（英文）分开维护且互链 --- */
+const readIfExists = (f) => { try { return readFileSync(join(root, f), 'utf8'); } catch (e) { return ''; } };
+const zhDoc = readIfExists('README.md');
+const enDoc = readIfExists('README.en.md');
+check('README 中英拆成两个文件', zhDoc.length > 500 && enDoc.length > 500, `zh ${zhDoc.length}B / en ${enDoc.length}B`);
+check('中文 README 链到英文版', /README\.en\.md/.test(zhDoc));
+check('英文 README 链到中文版', /README\.md/.test(enDoc));
+// 防止又退回「中英混排」：各自只保留本语言的章节标题
+const EN_HEADINGS = ['Features', 'Security Model', 'Quick Start', 'Internationalization', 'Tests', 'License'];
+const ZH_HEADINGS = ['功能特性', '安全模型', '快速开始', '国际化', '测试', '许可证'];
+const strayEn = EN_HEADINGS.filter((h) => new RegExp('^##\\s+' + h + '\\s*$', 'm').test(zhDoc));
+const strayZh = ZH_HEADINGS.filter((h) => new RegExp('^##\\s+' + h + '\\s*$', 'm').test(enDoc));
+check('中文 README 不含英文章节标题', strayEn.length === 0, strayEn.join(', '));
+check('英文 README 不含中文章节标题', strayZh.length === 0, strayZh.join(', '));
+check('两份 README 章节数一致', (zhDoc.match(/^## /gm) || []).length === (enDoc.match(/^## /gm) || []).length,
+  `zh ${(zhDoc.match(/^## /gm) || []).length} / en ${(enDoc.match(/^## /gm) || []).length}`);
+
+/* --- 18. 版本号：package.json 与页面 JSON-LD 的 softwareVersion 必须同步 --- */
+// 版本号散在两处，漏改会让搜索引擎读到的版本与包版本不一致，这里强制对齐
+const pkg = (() => { try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')); } catch (e) { return {}; } })();
+const ldVersion = (srcHtml.match(/"softwareVersion"\s*:\s*"([^"]+)"/) || [])[1] || '';
+check('版本号为 semver 三段式', /^\d+\.\d+\.\d+$/.test(String(pkg.version)), String(pkg.version));
+check('package.json 与页面 JSON-LD 版本号一致', !!pkg.version && pkg.version === ldVersion, `pkg ${pkg.version} / html ${ldVersion}`);
+check('构建产物里的 JSON-LD 版本号同步', html.includes('"softwareVersion":"' + pkg.version + '"') || html.includes('"softwareVersion": "' + pkg.version + '"'), String(pkg.version));
 
 console.error = origErr;
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败\n`);

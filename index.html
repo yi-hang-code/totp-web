@@ -36,7 +36,7 @@
     "applicationCategory": "UtilitiesApplication",
     "applicationSubCategory": "Security/Authentication",
     "operatingSystem": "Any modern web browser",
-    "softwareVersion": "1.0.0",
+    "softwareVersion": "1.1.0",
     "inLanguage": ["zh-CN", "en"],
     "isAccessibleForFree": true,
     "license": "https://opensource.org/licenses/MIT",
@@ -276,30 +276,31 @@
 
   <header class="top">
     <div>
-      <h1>TOTP 动态口令</h1>
-      <p class="sub">纯前端 · 零依赖 · 主密码加密后仅存本机浏览器</p>
+      <h1 data-i18n="app.h1">TOTP 动态口令</h1>
+      <p class="sub" data-i18n="header.sub">纯前端 · 零依赖 · 主密码加密后仅存本机浏览器</p>
     </div>
     <div class="top-actions">
-      <button id="btn-toggle-add" class="btn primary">+ 添加账户</button>
-      <button id="btn-crypto" class="btn">设置主密码</button>
-      <button id="btn-lock" class="btn hidden">锁定</button>
-      <button id="btn-clear" class="btn ghost">清空全部</button>
+      <button id="btn-toggle-add" class="btn primary" data-i18n="btn.toggleAdd">+ 添加账户</button>
+      <button id="btn-crypto" class="btn" data-i18n="btn.setPassword">设置主密码</button>
+      <button id="btn-lock" class="btn hidden" data-i18n="btn.lock">锁定</button>
+      <button id="btn-clear" class="btn ghost" data-i18n="btn.clear">清空全部</button>
+      <button id="btn-lang" class="btn ghost" data-i18n-title="btn.langTitle" title="切换语言 / Switch language">EN</button>
     </div>
   </header>
 
   <div id="env-warn" class="card hidden" style="padding:10px 12px;margin-bottom:12px;border-color:#fde68a;background:#fffbeb;color:#92400e;font-size:13px"></div>
 
   <section class="card secbar">
-    <span class="badge">纯本地运行</span>
-    <b>本页面不会向任何服务器发送数据，Secret 永不离开这台设备</b>
+    <span class="badge" data-i18n="secbar.badge">纯本地运行</span>
+    <b data-i18n="secbar.main">本页面不会向任何服务器发送数据，Secret 永不离开这台设备</b>
     <span class="spacer"></span>
-    <button id="btn-sec-detail" class="btn sm ghost">自检详情 ▾</button>
+    <button id="btn-sec-detail" class="btn sm ghost" data-i18n="secbar.detailOpen">自检详情 ▾</button>
     <div id="sec-detail" class="hidden">
       <ul>
-        <li><b>无后端</b>：页面没有任何服务端接口，口令由本机浏览器的 WebCrypto（HMAC-SHA1/256/512）在本地计算。</li>
-        <li><b>零网络</b>：自页面脚本运行以来，发起的网络请求 <span id="net-count" class="mono">0</span> 次（已覆盖 <code>fetch</code> / <code>XMLHttpRequest</code> / <code>WebSocket</code> / <code>sendBeacon</code>，可用 DevTools → Network 面板复核）。</li>
-        <li><b>存储位置</b>：账户与 Secret 只保存在本机浏览器的 <code>localStorage</code>（同源隔离、不上传），且<b>强制使用主密码加密</b> —— 现在添加的任何账户，落盘一律是 AES-GCM 密文，解密密钥由密码当场派生、随即丢弃，页面关闭/锁定后本机只剩密文（仅本版本之前遗留的历史明文数据例外，页面会提示你一次性加密）。忘记密码无法解密，请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。</li>
-        <li><b>二维码</b>：生成与识别都在本机完成 —— 绘制用内置编码器；识别优先用系统 <code>BarcodeDetector</code>（仅部分 Android/Chrome 可用），不可用时自动回退内置的 jsQR 解码库（Apache-2.0，已内联进本文件）。两者都不调用任何在线服务。</li>
+        <li data-i18n-html="secdetail.backend"><b>无后端</b>：页面没有任何服务端接口，口令由本机浏览器的 WebCrypto（HMAC-SHA1/256/512）在本地计算。</li>
+        <li data-i18n-html="secdetail.network"><b>零网络</b>：自页面脚本运行以来，发起的网络请求 <span id="net-count" class="mono">0</span> 次（已覆盖 <code>fetch</code> / <code>XMLHttpRequest</code> / <code>WebSocket</code> / <code>sendBeacon</code>，可用 DevTools → Network 面板复核）。</li>
+        <li data-i18n-html="secdetail.storage"><b>存储位置</b>：账户与 Secret 只保存在本机浏览器的 <code>localStorage</code>（同源隔离、不上传），且<b>强制使用主密码加密</b> —— 现在添加的任何账户，落盘一律是 AES-GCM 密文，解密密钥由密码当场派生、随即丢弃，页面关闭/锁定后本机只剩密文（仅本版本之前遗留的历史明文数据例外，页面会提示你一次性加密）。忘记密码无法解密，请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。</li>
+        <li data-i18n-html="secdetail.qr"><b>二维码</b>：生成与识别都在本机完成 —— 绘制用内置编码器；识别优先用系统 <code>BarcodeDetector</code>（仅部分 Android/Chrome 可用），不可用时自动回退内置的 jsQR 解码库（Apache-2.0，已内联进本文件）。两者都不调用任何在线服务。</li>
       </ul>
     </div>
   </section>
@@ -307,84 +308,171 @@
   <section id="add-panel" class="card add-panel">
     <div class="form-row">
       <label class="f">
-        <span>Secret / otpauth 链接（必填）</span>
-        <input id="in-secret" type="text" class="mono" placeholder="JBSWY3DPEHPK3PXP  或  otpauth://totp/..." autocomplete="off" spellcheck="false" />
+        <span data-i18n="form.secret">Secret / otpauth 链接（必填）</span>
+        <input id="in-secret" type="text" class="mono" data-i18n-ph="add.secretPh" placeholder="JBSWY3DPEHPK3PXP  或  otpauth://totp/..." autocomplete="off" spellcheck="false" />
       </label>
       <label class="f">
-        <span>备注名称（可选，支持 服务商:账号）</span>
+        <span data-i18n="form.label">备注名称（可选，支持 服务商:账号）</span>
         <input id="in-label" type="text" placeholder="GitHub:zhang@example.com" autocomplete="off" />
       </label>
       <div class="btns">
-        <button id="btn-scan" class="btn">扫码</button>
-        <button id="btn-pick" class="btn">图片</button>
-        <button id="btn-add" class="btn primary">添加</button>
+        <button id="btn-scan" class="btn" data-i18n="btn.scan">扫码</button>
+        <button id="btn-pick" class="btn" data-i18n="btn.pick">图片</button>
+        <button id="btn-add" class="btn primary" data-i18n="btn.add">添加</button>
       </div>
     </div>
 
-    <div class="adv-toggle"><button id="btn-adv" class="btn sm ghost">高级参数 ▾</button></div>
+    <div class="adv-toggle"><button id="btn-adv" class="btn sm ghost" data-i18n="btn.advOpen">高级参数 ▾</button></div>
     <div id="adv" class="adv hidden">
-      <label class="f"><span>位数 digits</span>
+      <label class="f"><span data-i18n="adv.digits">位数 digits</span>
         <select id="in-digits"><option>6</option><option>8</option></select>
       </label>
-      <label class="f"><span>周期 period（秒）</span>
+      <label class="f"><span data-i18n="adv.period">周期 period（秒）</span>
         <input id="in-period" type="number" min="5" max="300" step="1" value="30" />
       </label>
-      <label class="f"><span>算法 algorithm</span>
+      <label class="f"><span data-i18n="adv.algo">算法 algorithm</span>
         <select id="in-algo"><option>SHA1</option><option>SHA256</option><option>SHA512</option></select>
       </label>
     </div>
 
-    <div id="add-msg" class="hint">可直接粘贴 Google / Microsoft Authenticator 导出的 otpauth:// 链接，或手动输入 Base32 Secret。</div>
+    <div id="add-msg" class="hint" data-i18n="addMsg.default">可直接粘贴 Google / Microsoft Authenticator 导出的 otpauth:// 链接，或手动输入 Base32 Secret。</div>
   </section>
 
   <section id="onboard-panel" class="card onboard hidden">
-    <h3>请先设置一个主密码</h3>
-    <p>Secret 会保存在这台设备的浏览器里。为防止任何人打开浏览器就直接看到，<b>本工具要求先设置主密码</b>：它只在本机加密你的 Secret，密码本身不会被保存。</p>
+    <h3 data-i18n="onboard.h3">请先设置一个主密码</h3>
+    <p data-i18n-html="onboard.p">Secret 会保存在这台设备的浏览器里。为防止任何人打开浏览器就直接看到，<b>本工具要求先设置主密码</b>：它只在本机加密你的 Secret，密码本身不会被保存。</p>
     <ul>
-      <li>密码仅用于当场派生解密密钥，<b>不会被保存</b>，每次打开页面都要重新输入</li>
-      <li>遗忘后<b>无法找回</b> —— 只能清除本机浏览器数据并重新设置</li>
-      <li>解锁状态闲置 5 分钟会自动锁定</li>
+      <li data-i18n-html="onboard.li1">密码仅用于当场派生解密密钥，<b>不会被保存</b>，每次打开页面都要重新输入</li>
+      <li data-i18n-html="onboard.li2">遗忘后<b>无法找回</b> —— 只能清除本机浏览器数据并重新设置</li>
+      <li data-i18n="onboard.li3">解锁状态闲置 {{min}} 分钟会自动锁定</li>
     </ul>
     <div class="cta">
-      <button id="btn-onboard-set" class="btn primary">设置主密码</button>
-      <p class="tip">设置完成后即可添加第一个账户</p>
+      <button id="btn-onboard-set" class="btn primary" data-i18n="btn.setPassword">设置主密码</button>
+      <p class="tip" data-i18n="onboard.tip">设置完成后即可添加第一个账户</p>
     </div>
   </section>
 
   <div id="upgrade-tip" class="card warnbar hidden">
-    <b>建议设置主密码</b><span id="upgrade-text"></span>
-    <button id="btn-upgrade-set" class="btn sm">立即设置</button>
+    <b data-i18n="upgrade.title">建议设置主密码</b><span id="upgrade-text"></span>
+    <button id="btn-upgrade-set" class="btn sm" data-i18n="btn.setNow">立即设置</button>
   </div>
 
   <section id="lock-panel" class="card lock hidden">
-    <div class="lock-head">本机浏览器数据已用主密码加密</div>
-    <p class="tip">主密码<b>不会以任何形式保存</b>，仅用于当场派生解密密钥；刷新或重开页面后需重新输入，闲置 5 分钟也会自动锁定。密码遗忘无法找回，只能清除本机浏览器数据后重新设置。</p>
+    <div class="lock-head" data-i18n="lock.head">本机浏览器数据已用主密码加密</div>
+    <p class="tip" data-i18n-html="lock.tip">主密码<b>不会以任何形式保存</b>，仅用于当场派生解密密钥；刷新或重开页面后需重新输入，闲置 5 分钟也会自动锁定。密码遗忘无法找回，只能清除本机浏览器数据后重新设置。</p>
     <div class="lock-row">
-      <input id="in-master" type="password" placeholder="请输入主密码" autocomplete="current-password" spellcheck="false" />
-      <button id="btn-unlock" class="btn primary">解锁</button>
+      <input id="in-master" type="password" placeholder="请输入主密码" data-i18n-ph="lock.ph" autocomplete="current-password" spellcheck="false" />
+      <button id="btn-unlock" class="btn primary" data-i18n="btn.unlock">解锁</button>
     </div>
     <div id="lock-msg" class="hint"></div>
     <div class="lock-foot">
-      <button id="btn-wipe" class="btn danger sm">忘记密码？清除本机浏览器加密数据</button>
+      <button id="btn-wipe" class="btn danger sm" data-i18n="btn.wipe">忘记密码？清除本机浏览器加密数据</button>
     </div>
   </section>
 
-  <div id="copy-tip" class="copy-tip hidden">点击卡片中的口令数字即可复制，复制后数字上会浮出「已复制」提示</div>
+  <div id="copy-tip" class="copy-tip hidden" data-i18n="copyTip">点击卡片中的口令数字即可复制，复制后数字上会浮出「已复制」提示</div>
   <section id="list" class="grid"></section>
   <div id="empty" class="empty">
-    <b>还没有账户</b>
-    点击右上角「添加账户」，输入 Secret 或扫描二维码开始使用。
+    <b data-i18n="empty.title">还没有账户</b>
+    <span data-i18n="empty.text">点击右上角「添加账户」，输入 Secret 或扫描二维码开始使用。</span>
   </div>
 
   <footer>
     <div id="sec-note" class="warnbar">安全提示：Secret 以主密码加密后保存在本机浏览器的 localStorage，密码本身不保存、遗忘无法找回；解锁后明文只在内存中，闲置 5 分钟自动锁定。忘记密码请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。</div>
-    <div>实现遵循 RFC 6238（TOTP）/ RFC 4226（HOTP 计数与截断）；时间取自本机系统时钟，若本机时间不准会导致验证码不匹配，请先校准系统时间。</div>
+    <div data-i18n="footer.impl">实现遵循 RFC 6238（TOTP）/ RFC 4226（HOTP 计数与截断）；时间取自本机系统时钟，若本机时间不准会导致验证码不匹配，请先校准系统时间。</div>
   </footer>
 </div>
 
 <div id="modal" class="modal hidden"><div class="box" id="modal-box"></div></div>
 <div id="toast"></div>
 <input id="file-input" type="file" accept="image/*" class="hidden" />
+
+<script id="i18n-lib">
+/* ============================================================
+ * 国际化（i18n）：词条表 + 取值 / 检测 / 切换 / 持久化
+ *
+ * 设计约定：
+ *  - 静态 HTML 保留**中文**作为基线（利于 SEO 与无 JS 降级），
+ *    切到英文时由 JS 覆盖带 data-i18n 的元素。
+ *  - 语言优先级：localStorage 记忆 > navigator.language 检测 > 中文兜底。
+ *  - 取值：t('key')；插值：t('key', {n: 3})，模板里写 {{n}}。
+ *  - 复数：词条值写成 {one:'...', other:'...'}，传 {n} 自动选形。
+ *  - 含 HTML 的条目用 data-i18n-html（innerHTML），纯文本用 data-i18n。
+ * ============================================================ */
+var I18N = {};
+/*__I18N_PACKS__*/
+
+var I18N_LANG = { zh: 'zh-CN', en: 'en' };
+var I18N_KEY = 'totp-web-locale';
+var LOCALE = 'zh';
+
+function detectLocale() {
+  try {
+    var saved = localStorage.getItem(I18N_KEY);
+    if (saved && I18N[saved]) return saved;
+  } catch (e) {}
+  var nav = String((navigator.language || (navigator.languages && navigator.languages[0]) || '')).toLowerCase();
+  if (nav.indexOf('en') === 0) return 'en';
+  if (nav.indexOf('zh') === 0) return 'zh';
+  return 'zh';
+}
+
+function t(key, vars) {
+  var pack = I18N[LOCALE] || I18N.zh;
+  var val = pack[key];
+  if (val == null) {
+    val = I18N.zh[key];
+    if (val == null) return key;
+  }
+  if (val && typeof val === 'object') {
+    var n = vars && vars.n;
+    val = (Number(n) === 1 && val.one != null) ? val.one : (val.other != null ? val.other : val.one);
+  }
+  if (typeof val !== 'string') return key;
+  if (vars) {
+    val = val.replace(/\{\{(\w+)\}\}/g, function (m, k) {
+      return (vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : m;
+    });
+  }
+  return val;
+}
+
+function applyI18n() {
+  var i, nodes, v;
+  nodes = document.querySelectorAll('[data-i18n]');
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n')); nodes[i].textContent = v; }
+  nodes = document.querySelectorAll('[data-i18n-html]');
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-html')); nodes[i].innerHTML = v; }
+  nodes = document.querySelectorAll('[data-i18n-ph]');
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-ph')); nodes[i].setAttribute('placeholder', v); }
+  nodes = document.querySelectorAll('[data-i18n-title]');
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-title')); nodes[i].setAttribute('title', v); }
+  var lb = document.getElementById('btn-lang');
+  if (lb){
+    var avail = [];
+    for (var k in I18N){ if (I18N[k]) avail.push(k); }
+    // 单语构建（--lang=zh）没有可切换的目标，隐藏按钮而不是给一个点了没反应的开关
+    if (avail.length < 2) lb.classList.add('hidden');
+    else lb.textContent = (LOCALE === 'zh' ? 'EN' : '中文');
+  }
+  if (typeof window.__i18nPostApply === 'function') {
+    try { window.__i18nPostApply(); } catch (e) {}
+  }
+}
+
+function setLocale(l) {
+  if (!I18N[l]) l = 'zh';
+  LOCALE = l;
+  try { localStorage.setItem(I18N_KEY, l); } catch (e) {}
+  document.documentElement.lang = I18N_LANG[l] || l;
+  document.title = t('app.title');
+  applyI18n();
+}
+
+LOCALE = detectLocale();
+document.documentElement.lang = I18N_LANG[LOCALE] || LOCALE;
+document.title = t('app.title');
+</script>
 
 <script id="core-lib">
 /* ============================================================
@@ -393,17 +481,21 @@
  * ============================================================ */
 
 /* ---------- Base32 ---------- */
+// 抛错时附带 code，供 UI 层按当前语言翻译。
+// core-lib 自身不依赖 i18n，这样它仍能单独在 Node 中被抽取自测。
+function mkErr(code, msg){ var e = new Error(msg); e.code = code; return e; }
+
 var B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 function normalizeSecret(s){
   return String(s == null ? '' : s).toUpperCase().replace(/[\s\-\r\n\t]/g, '').replace(/=+$/, '');
 }
 function base32Decode(input){
   var s = normalizeSecret(input);
-  if (!s) throw new Error('Secret 不能为空');
+  if (!s) throw mkErr('EMPTY_SECRET', 'Secret 不能为空');
   var bits = 0, value = 0, out = [];
   for (var i = 0; i < s.length; i++){
     var idx = B32.indexOf(s.charAt(i));
-    if (idx < 0) throw new Error('非法 Base32 字符 "' + s.charAt(i) + '"（Base32 只含 A-Z 与 2-7）');
+    if (idx < 0) throw mkErr('BAD_BASE32', '非法 Base32 字符 "' + s.charAt(i) + '"（Base32 只含 A-Z 与 2-7）');
     value = (value << 5) | idx; bits += 5;
     if (bits >= 8){ out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
   }
@@ -428,8 +520,8 @@ async function generateTOTP(secret, opts, timeMs){
   var digits = Number(opts.digits) || 6;
   var algo = String(opts.algorithm || 'SHA1').toUpperCase();
   var t = (timeMs == null ? Date.now() : timeMs);
-  if (digits !== 6 && digits !== 8) throw new Error('digits 只能是 6 或 8');
-  if (!(period >= 5 && period <= 300)) throw new Error('period 需在 5-300 秒之间');
+  if (digits !== 6 && digits !== 8) throw mkErr('BAD_DIGITS', 'digits 只能是 6 或 8');
+  if (!(period >= 5 && period <= 300)) throw mkErr('BAD_PERIOD', 'period 需在 5-300 秒之间');
   var key = base32Decode(secret);
   var counter = Math.floor(t / 1000 / period);
   var mac = await hmacBytes(key, counterBytes(counter), algo);
@@ -443,13 +535,13 @@ async function generateTOTP(secret, opts, timeMs){
 function parseOtpauthUri(uri){
   var raw = String(uri || '').trim();
   var m = /^otpauth:\/\/(totp|hotp)\/([^?]*)(?:\?([\s\S]*))?$/i.exec(raw);
-  if (!m) throw new Error('不是合法的 otpauth:// 链接');
+  if (!m) throw mkErr('BAD_OTPAUTH', '不是合法的 otpauth:// 链接');
   var type = m[1].toLowerCase();
   var label = '';
   try { label = decodeURIComponent(m[2] || ''); } catch (e) { label = m[2] || ''; }
   var q = new URLSearchParams(m[3] || '');
   var secret = (q.get('secret') || '').trim();
-  if (!secret) throw new Error('链接中缺少 secret 参数');
+  if (!secret) throw mkErr('NO_SECRET_PARAM', '链接中缺少 secret 参数');
   base32Decode(secret); // 提前校验
   var issuer = (q.get('issuer') || '').trim();
   var account = label;
@@ -538,7 +630,7 @@ var QR = (function(){
     for (var v = 1; v <= 10; v++){
       if (capacityBits(v) - overheadBits(v) >= bytes.length * 8){ version = v; break; }
     }
-    if (!version) throw new Error('内容过长（>213 字节），无法生成二维码');
+    if (!version) throw mkErr('QR_TOO_LONG', '内容过长（>213 字节），无法生成二维码');
 
     var bits = [];
     function push(val, len){ for (var i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); }
@@ -744,6 +836,14 @@ if (typeof module !== 'undefined' && module.exports){
 <script id="app">
 (function(){
   var $ = function(id){ return document.getElementById(id); };
+  // 算法库抛错带 code，这里按当前语言取译文；没有 code 就退回原始 message
+  function errMsg(e){
+    if (e && e.code){
+      var k = 'err.' + e.code;
+      if ((I18N[LOCALE] && I18N[LOCALE][k] != null) || I18N.zh[k] != null) return t(k);
+    }
+    return (e && e.message) || '';
+  }
 
   /* ---------- 网络请求自检：统计本页脚本运行后发起的对外请求 ---------- */
   var netCount = 0;
@@ -771,16 +871,16 @@ if (typeof module !== 'undefined' && module.exports){
   var cards = new Map();     // id -> {el, code, bar, sec, counter}
 
   /* ---------- 环境检测 ---------- */
-  var envMsg = [];
-  if (!(window.crypto && crypto.subtle)){
-    envMsg.push('当前环境不支持 WebCrypto（需 https 或 localhost），口令生成不可用。');
+  // 抽成函数：切换语言时要能按新语言重算，否则提示条会停在旧语言
+  function applyEnvWarn(){
+    var envMsg = [];
+    if (!(window.crypto && crypto.subtle)) envMsg.push(t('env.noWebCrypto'));
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) envMsg.push(t('env.noCamera'));
+    var w = $('env-warn');
+    w.classList.toggle('hidden', envMsg.length === 0);
+    w.textContent = envMsg.join(' ');
   }
-  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
-    envMsg.push('当前环境无法调用摄像头（浏览器要求 https 或 localhost）；可用「图片」识别二维码，或手动输入 Secret。');
-  }
-  if (envMsg.length){
-    var w = $('env-warn'); w.classList.remove('hidden'); w.textContent = envMsg.join(' ');
-  }
+  applyEnvWarn();
 
   /* ---------- 存储 ---------- */
   function load(){
@@ -804,7 +904,7 @@ if (typeof module !== 'undefined' && module.exports){
   async function save(){
     try {
       if (state.mode === 'enc'){
-        if (!state.cryptoKey){ toast('未解锁，无法保存'); return; }
+        if (!state.cryptoKey){ toast(t('toast.notUnlocked')); return; }
         var enc = await encryptString(state.cryptoKey, JSON.stringify({ v: 2, accounts: state.accounts }));
         // 回写 iv/密文：每次加密 IV 都会变，内存里的元数据必须同步，否则本会话内锁定后再解锁会拿到过期密文
         state.encMeta.iv = enc.iv; state.encMeta.data = enc.data;
@@ -815,7 +915,7 @@ if (typeof module !== 'undefined' && module.exports){
       } else {
         localStorage.setItem(STORE_KEY, JSON.stringify({ v: 2, mode: 'plain', accounts: state.accounts }));
       }
-    } catch (e){ toast('保存失败：' + (e && e.message ? e.message : '本地存储不可用')); }
+    } catch (e){ toast(t('toast.saveFailed', { msg: (e && e.message) || t('err.localStorageUnavailable') })); }
   }
   function normalizeAccount(a){
     return {
@@ -834,6 +934,10 @@ if (typeof module !== 'undefined' && module.exports){
   function toast(msg){
     var t = $('toast'); t.textContent = msg; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+  // 切换语言时收起提示：它是一次性反馈，留在旧语言里反而误导
+  function hideToast(){
+    var el = $('toast'); el.classList.remove('show'); el.textContent = '';
   }
   function openModal(html){ $('modal-box').innerHTML = html; $('modal').classList.remove('hidden'); }
   function closeModal(){ $('modal').classList.add('hidden'); $('modal-box').innerHTML = ''; stopScan(); }
@@ -862,24 +966,23 @@ if (typeof module !== 'undefined' && module.exports){
     // 加密一旦启用就不可关闭（否则等于给了一个把 Secret 变回明文的开关）。
     // 因此：引导态 / 已加密未锁定时都隐藏该按钮，只在「未加密」和「已锁定」时露出。
     $('btn-crypto').classList.toggle('hidden', onboarding || (state.mode === 'enc' && !locked));
-    $('btn-crypto').textContent = locked ? '已加密 · 解锁' : '设置主密码';
+    $('btn-crypto').textContent = locked ? t('btn.encryptedUnlock') : t('btn.setPassword');
     $('btn-lock').classList.toggle('hidden', !(state.mode === 'enc' && !locked));
-    $('btn-lock').title = '立即锁定（闲置 ' + (IDLE_LOCK_MS / 60000) + ' 分钟也会自动锁定）';
+    $('btn-lock').title = t('btn.lockTitle', { min: IDLE_LOCK_MS / 60000 });
     $('btn-clear').classList.toggle('hidden', locked || onboarding || state.accounts.length === 0);
     // 强制引导 + 加密不可关闭后，未设主密码就无法存任何 Secret：
     // 明文态只可能是「本应用早期版本遗留的历史数据」这一种情况
     var plainCount = state.mode === 'plain' ? state.accounts.length : 0;
     $('sec-note').textContent = state.mode === 'enc'
-      ? '安全提示：Secret 已用主密码（PBKDF2 + AES-GCM）加密后保存在本机浏览器的 localStorage，密码本身不保存、遗忘无法找回。解锁后明文只存在于内存，手动点「锁定」或闲置 5 分钟即释放；忘记密码请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。'
+      ? t('secNote.enc', { min: IDLE_LOCK_MS / 60000 })
       : (plainCount
-        ? '安全提示：当前有 ' + plainCount + ' 个账户的 Secret 未加密存在本机浏览器的 localStorage（本应用早期版本遗留的历史明文数据），任何能打开这台浏览器的人都能直接看到 —— 它不会上传，但也没有加密保护。点上方提示条中的「立即设置」即可一次性加密（加密后不可关闭）。'
-        : '本机浏览器暂无账户。添加账户前必须先设置主密码，Secret 只会以密文落到本机浏览器。');
+        ? t('secNote.plainAccounts', { n: plainCount })
+        : t('secNote.plainEmpty'));
 
-    if (state.mode === 'plain' && !locked && state.hasStoredData){
-      $('upgrade-text').textContent = plainCount
-        ? '：仍有 ' + plainCount + ' 个账户的 Secret 以明文保存在本机浏览器，任何能打开这台浏览器的人都能直接看到。'
-        : '：尚未启用加密存储，添加账户前会先要求设置主密码。';
-    }
+    // 提示条与文案同步刷新：即使当前不可见也要更新，否则切语言后残留旧语言文本
+    $('upgrade-text').textContent = (state.mode === 'plain' && !locked && state.hasStoredData)
+      ? (plainCount ? t('upgrade.hasPlain', { n: plainCount }) : t('upgrade.noPlain'))
+      : '';
   }
   function render(){
     var locked = state.mode === 'enc' && state.locked;
@@ -889,25 +992,25 @@ if (typeof module !== 'undefined' && module.exports){
     (locked ? [] : state.accounts).forEach(function(acc){
       var el = document.createElement('div');
       el.className = 'card acc';
-      var title = acc.account || '未命名账户';
+      var title = acc.account || t('card.unnamed');
       el.innerHTML =
         '<div class="head">' +
           '<div><div class="name">' + escapeHtml(title) + '</div>' +
             (acc.issuer ? '<div class="issuer">' + escapeHtml(acc.issuer) + '</div>' : '') + '</div>' +
-          '<button class="x" data-act="del" title="删除">×</button>' +
+          '<button class="x" data-act="del" title="' + t('card.del') + '">×</button>' +
         '</div>' +
-        '<div class="code mono" data-act="copy" title="点击复制口令">------</div>' +
+        '<div class="code mono" data-act="copy" title="' + t('card.copyTitle') + '">------</div>' +
         '<div class="bar-wrap"><div class="bar"></div></div>' +
         '<div class="meta"><span class="sec">--</span>' +
-          '<span class="ops"><button class="btn sm" data-act="copy-btn">复制</button>' +
-          '<button class="btn sm" data-act="qr">二维码</button></span></div>';
+          '<span class="ops"><button class="btn sm" data-act="copy-btn">' + t('card.copy') + '</button>' +
+          '<button class="btn sm" data-act="qr">' + t('card.qr') + '</button></span></div>';
 
       el.querySelector('[data-act=del]').addEventListener('click', async function(){
-        if (!confirm('删除账户「' + title + '」？此操作不可撤销。')) return;
+        if (!confirm(t('confirm.deleteAccount', { name: title }))) return;
         state.accounts = state.accounts.filter(function(x){ return x.id !== acc.id; });
         if (addMsgAccId === acc.id) resetAddMsg(); // 提示里挂的就是它，别留下“已添加”的陈旧提示
         await save(); render();
-        toast('已删除「' + title + '」');
+        toast(t('toast.deleted', { name: title }));
       });
       var codeEl = el.querySelector('.code');
       // 桌面：点数字本身复制（有 hover 提示 + 手型光标）
@@ -960,7 +1063,7 @@ if (typeof module !== 'undefined' && module.exports){
         var counter = Math.floor(now / 1000 / acc.period);
         var ratio = remain / periodMs;
         ref.bar.style.width = (ratio * 100).toFixed(2) + '%';
-        ref.sec.textContent = Math.ceil(remain / 1000) + 's · ' + acc.digits + '位 · ' + String(acc.algorithm).replace('SHA', 'SHA-');
+        ref.sec.textContent = t('card.meta', { sec: Math.ceil(remain / 1000), digits: acc.digits, algo: String(acc.algorithm).replace('SHA', 'SHA-') });
         var warn = remain <= 5000;
         ref.bar.classList.toggle('warn', warn);
         ref.code.classList.toggle('warn', warn);
@@ -971,8 +1074,8 @@ if (typeof module !== 'undefined' && module.exports){
             var code = await generateTOTP(acc.secret, acc, now);
             if (cards.get(acc.id) === ref && ref.counter === c) ref.code.textContent = code;
           } catch (e){
-            ref.code.textContent = '错误';
-            ref.code.title = e.message;
+            ref.code.textContent = t('card.error');
+            ref.code.title = errMsg(e);
           }
         }
       }
@@ -983,9 +1086,9 @@ if (typeof module !== 'undefined' && module.exports){
 
   /* ---------- 剪贴板 ---------- */
   function copyText(text, note, flashEl){
-    if (!text || text === '------'){ toast('还没有生成口令'); return; }
+    if (!text || text === '------'){ toast(t('toast.noCode')); return; }
     var done = function(){
-      toast(note || ('已复制 ' + text));
+      toast(note || t('toast.copied', { text: text }));
       // 就地反馈：底部 toast 容易被忽略，复制后直接在被点的元素上盖一个“已复制”气泡
       if (flashEl){
         if (flashEl._copyTimer) clearTimeout(flashEl._copyTimer);
@@ -1025,8 +1128,8 @@ if (typeof module !== 'undefined' && module.exports){
     // 复制真的失败时：说清楚原因，并顺手选中口令，用户可以长按/⌘C 手动复制
     function fail(){
       toast(window.isSecureContext === false
-        ? 'http 访问无法调用系统剪贴板，已选中口令，请长按复制（或改用 https/localhost 打开）'
-        : '复制失败，已选中口令，请长按或 Ctrl+C 复制');
+        ? t('toast.clipboardHttp')
+        : t('toast.copyFailed'));
       if (flashEl && window.getSelection){
         try {
           var r = document.createRange();
@@ -1041,7 +1144,7 @@ if (typeof module !== 'undefined' && module.exports){
   /* ---------- 添加账户 ---------- */
   function parseInput(rawSecret, labelRaw, opts){
     var s = String(rawSecret || '').trim();
-    if (!s) throw new Error('请填写 Secret 或 otpauth 链接');
+    if (!s) throw new Error(t('err.emptyInput'));
     var acc;
     if (/^otpauth:\/\//i.test(s)){
       acc = parseOtpauthUri(s);
@@ -1071,12 +1174,12 @@ if (typeof module !== 'undefined' && module.exports){
     var m = $('add-msg');
     if (!m) return;
     m.className = 'hint';
-    m.textContent = '可直接粘贴 Google / Microsoft Authenticator 导出的 otpauth:// 链接，或手动输入 Base32 Secret。';
+    m.textContent = t('addMsg.default');
   }
 
   $('btn-add').addEventListener('click', async function(){
     var msg = $('add-msg');
-    msg.className = 'hint'; msg.textContent = '校验中…';
+    msg.className = 'hint'; msg.textContent = t('addMsg.checking');
     addMsgAccId = null; // 一旦进入校验/报错，就不再让旧账户“认领”这条提示
     var opts = {
       digits: Number($('in-digits').value) || 6,
@@ -1085,19 +1188,19 @@ if (typeof module !== 'undefined' && module.exports){
     };
     var acc;
     try { acc = parseInput($('in-secret').value, $('in-label').value, opts); }
-    catch (e){ msg.className = 'hint err'; msg.textContent = e.message; return; }
+    catch (e){ msg.className = 'hint err'; msg.textContent = errMsg(e); return; }
     try { await generateTOTP(acc.secret, acc, Date.now()); }
-    catch (e){ msg.className = 'hint err'; msg.textContent = 'Secret 无效：' + e.message; return; }
+    catch (e){ msg.className = 'hint err'; msg.textContent = t('err.invalidSecret', { msg: errMsg(e) }); return; }
 
     if (state.accounts.some(function(x){ return x.secret === acc.secret && x.account === acc.account; })){
-      msg.className = 'hint err'; msg.textContent = '该账户已存在'; return;
+      msg.className = 'hint err'; msg.textContent = t('err.duplicate'); return;
     }
     state.accounts.unshift(acc);
     await save(); render();
     $('in-secret').value = ''; $('in-label').value = ''; lastAuto = '';
-    msg.className = 'hint'; msg.textContent = '已添加「' + (acc.account || acc.issuer || '未命名') + '」';
+    msg.className = 'hint'; msg.textContent = t('addMsg.added', { name: (acc.account || acc.issuer || t('card.unnamed')) });
     addMsgAccId = acc.id; // 记住这条提示说的是谁，删掉它时好一并撤掉
-    toast('账户已添加');
+    toast(t('toast.added'));
   });
 
   $('btn-toggle-add').addEventListener('click', function(){
@@ -1107,42 +1210,40 @@ if (typeof module !== 'undefined' && module.exports){
   });
   $('btn-sec-detail').addEventListener('click', function(){
     var d = $('sec-detail'); var hide = d.classList.toggle('hidden');
-    this.textContent = hide ? '自检详情 ▾' : '自检详情 ▴';
+    this.textContent = hide ? t('secbar.detailOpen') : t('secbar.detailClose');
   });
   $('btn-adv').addEventListener('click', function(){
     var a = $('adv'); var hide = a.classList.toggle('hidden');
-    this.textContent = hide ? '高级参数 ▾' : '高级参数 ▴';
+    this.textContent = hide ? t('btn.advOpen') : t('btn.advClose');
   });
   $('btn-clear').addEventListener('click', async function(){
     if (!state.accounts.length) return;
-    if (!confirm('清空全部 ' + state.accounts.length + ' 个账户？Secret 将从本机浏览器删除。')) return;
-    state.accounts = []; await save(); render(); toast('已清空');
+    if (!confirm(t('confirm.clearAll', { n: state.accounts.length }))) return;
+    state.accounts = []; await save(); render(); toast(t('toast.cleared'));
   });
 
   /* ---------- 主密码：加密 / 解锁 / 锁定 / 清除 ---------- */
   function showSetPassword(){
     openModal(
-      '<h3>设置主密码</h3>' +
-      '<div class="tip">启用后，本机浏览器保存的 Secret 会用该密码派生的密钥（PBKDF2 + AES-GCM）加密。' +
-      '<b>密码不会被保存</b>，每次打开页面都要重新输入；加密<b>一旦启用不可关闭</b>，如需更换只能清除本机浏览器数据后重设。</div>' +
-      '<label class="f" style="margin-top:10px"><span>主密码（至少 6 位）</span>' +
+      '<h3>' + t('modal.setTitle') + '</h3>' +
+      '<div class="tip">' + t('modal.setTip') + '</div>' +
+      '<label class="f" style="margin-top:10px"><span>' + t('modal.pw1', { min: 6 }) + '</span>' +
         '<input id="pw1" type="password" autocomplete="new-password" /></label>' +
-      '<label class="f" style="margin-top:8px"><span>确认主密码</span>' +
+      '<label class="f" style="margin-top:8px"><span>' + t('modal.pw2') + '</span>' +
         '<input id="pw2" type="password" autocomplete="new-password" /></label>' +
       '<label class="pw-ack"><input id="pw-ack" type="checkbox" />' +
-        '<span>我已牢记该密码，并理解：<b>密码不会被保存</b>，遗忘后<b>无法找回</b>，' +
-        '只能清除本机浏览器数据并重新设置。闲置 5 分钟会自动锁定。</span></label>' +
-      '<div class="foot"><button class="btn" id="pw-cancel">取消</button>' +
-        '<button class="btn primary" id="pw-ok">启用加密</button></div>'
+        '<span>' + t('modal.ack', { min: IDLE_LOCK_MS / 60000 }) + '</span></label>' +
+      '<div class="foot"><button class="btn" id="pw-cancel">' + t('btn.cancel') + '</button>' +
+        '<button class="btn primary" id="pw-ok">' + t('btn.enable') + '</button></div>'
     );
     $('pw-cancel').onclick = closeModal;
     $('pw1').focus();
     $('pw-ok').onclick = async function(){
       var p1 = $('pw1').value, p2 = $('pw2').value;
-      if (p1.length < 6){ toast('密码至少 6 位'); return; }
-      if (p1 !== p2){ toast('两次输入的密码不一致'); return; }
-      if (!$('pw-ack').checked){ toast('请先确认已牢记密码'); return; }
-      this.disabled = true; this.textContent = '正在派生密钥…';
+      if (p1.length < 6){ toast(t('toast.pwTooShort', { min: 6 })); return; }
+      if (p1 !== p2){ toast(t('toast.pwMismatch')); return; }
+      if (!$('pw-ack').checked){ toast(t('toast.pwAckRequired')); return; }
+      this.disabled = true; this.textContent = t('btn.deriving');
       try {
         var salt = crypto.getRandomValues(new Uint8Array(16));
         var key = await deriveKey(p1, salt, PBKDF2_ITER);
@@ -1151,23 +1252,23 @@ if (typeof module !== 'undefined' && module.exports){
         await save();
         state.hasStoredData = true; lastActivity = Date.now();
         closeModal(); render();
-        toast('已启用加密，请牢记密码（密码不存储，遗忘只能清空重设）');
+        toast(t('toast.enabled'));
       } catch (e){
-        this.disabled = false; this.textContent = '启用加密';
-        toast('启用失败：' + (e && e.message ? e.message : e));
+        this.disabled = false; this.textContent = t('btn.enable');
+        toast(t('toast.enableFailed', { msg: (e && e.message) || e }));
       }
     };
   }
 
   async function unlock(password){
     var btn = $('btn-unlock'), msg = $('lock-msg');
-    msg.className = 'hint'; msg.textContent = '正在派生密钥并解密…';
-    btn.disabled = true; btn.textContent = '解锁中…';
+    msg.className = 'hint'; msg.textContent = t('lock.deriving');
+    btn.disabled = true; btn.textContent = t('btn.unlocking');
     try {
       // 始终以存储中的最新密文为准（可能由另一个标签页写入）
       var cur = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
       var meta = (cur && cur.enc) || state.encMeta;
-      if (!meta || !meta.data) throw new Error('本机浏览器没有加密数据');
+      if (!meta || !meta.data) throw new Error(t('err.noEncData'));
       var key = await deriveKey(password, b64decode(meta.salt), meta.iter || PBKDF2_ITER);
       var json = await decryptString(key, meta.iv, meta.data);
       var data = JSON.parse(json);
@@ -1177,13 +1278,13 @@ if (typeof module !== 'undefined' && module.exports){
       lastActivity = Date.now();
       $('in-master').value = '';
       msg.textContent = '';
-      render(); toast('已解锁');
+      render(); toast(t('toast.unlocked'));
     } catch (e){
       // AES-GCM 认证失败 = 密码错误（或数据被篡改）
       msg.className = 'hint err';
-      msg.textContent = '密码错误，或本机浏览器加密数据已损坏。若忘记密码，可清除后重新录入。';
+      msg.textContent = t('err.unlockFailed');
     } finally {
-      btn.disabled = false; btn.textContent = '解锁';
+      btn.disabled = false; btn.textContent = t('btn.unlock');
     }
   }
 
@@ -1191,15 +1292,15 @@ if (typeof module !== 'undefined' && module.exports){
     state.cryptoKey = null; state.locked = true; state.accounts = [];
     lastActivity = Date.now();
     render();
-    toast(auto ? '已闲置超过 ' + (IDLE_LOCK_MS / 60000) + ' 分钟，自动锁定' : '已锁定，需重新输入主密码');
+    toast(auto ? t('toast.autoLocked', { min: IDLE_LOCK_MS / 60000 }) : t('toast.locked'));
   }
 
   function wipeEncrypted(){
-    if (!confirm('将永久删除本机浏览器保存的全部账户与加密数据，且无法恢复。确定继续？')) return;
+    if (!confirm(t('confirm.wipe'))) return;
     try { localStorage.removeItem(STORE_KEY); } catch (e){}
     state.accounts = []; state.mode = 'plain'; state.locked = false; state.cryptoKey = null; state.encMeta = null;
     state.hasStoredData = false;   // 回到新用户态，重新引导设置主密码
-    render(); toast('已清除本机浏览器数据，请重新设置主密码');
+    render(); toast(t('toast.wiped'));
   }
 
   $('btn-crypto').addEventListener('click', function(){
@@ -1225,13 +1326,13 @@ if (typeof module !== 'undefined' && module.exports){
     var scale = Math.max(3, Math.floor(300 / total));
     var px = total * scale;
     openModal(
-      '<h3>' + escapeHtml(acc.account || acc.issuer || '账户') + ' · 迁移二维码</h3>' +
+      '<h3>' + escapeHtml(acc.account || acc.issuer || t('qr.unnamed')) + t('qr.titleSuffix') + '</h3>' +
       '<canvas id="qr-canvas" width="' + px + '" height="' + px + '"></canvas>' +
-      '<div class="tip">用另一台设备的验证器 App 扫描即可导入。<br><span class="mono" style="font-size:11px;word-break:break-all">' + escapeHtml(uri).replace(/(secret=)([^&]+)/, '$1' + escapeHtml(acc.secret.slice(0, 4)) + '••••') + '</span></div>' +
-      '<div class="foot"><button class="btn" id="qr-copy">复制链接</button><button class="btn primary" id="qr-close">关闭</button></div>'
+      '<div class="tip">' + t('qr.tip', { uri: escapeHtml(uri).replace(/(secret=)([^&]+)/, '$1' + escapeHtml(acc.secret.slice(0, 4)) + '••••') }) + '</div>' +
+      '<div class="foot"><button class="btn" id="qr-copy">' + t('btn.copyLink') + '</button><button class="btn primary" id="qr-close">' + t('btn.close') + '</button></div>'
     );
     var cv = $('qr-canvas'), ctx = cv.getContext && cv.getContext('2d');
-    if (!ctx){ toast('当前环境不支持 Canvas，无法渲染二维码'); closeModal(); return; }
+    if (!ctx){ toast(t('toast.noCanvas')); closeModal(); return; }
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
     ctx.fillStyle = '#111827';
     for (var r = 0; r < m.size; r++) for (var c = 0; c < m.size; c++){
@@ -1239,7 +1340,7 @@ if (typeof module !== 'undefined' && module.exports){
     }
     $('qr-close').onclick = closeModal;
     $('qr-copy').onclick = function(){
-      copyText(uri, '链接已复制（内含 Secret，请勿粘贴到聊天、网页或工单）');
+      copyText(uri, t('toast.linkCopied'));
     };
   }
 
@@ -1303,7 +1404,7 @@ if (typeof module !== 'undefined' && module.exports){
     return new Promise(function(resolve, reject){
       var img = new Image();
       img.onload = function(){ resolve(img); };
-      img.onerror = function(){ reject(new Error('图片无法读取')); };
+      img.onerror = function(){ reject(new Error(t('err.imageUnreadable'))); };
       img.src = URL.createObjectURL(file);
     });
   }
@@ -1315,8 +1416,10 @@ if (typeof module !== 'undefined' && module.exports){
     $('in-algo').value = p.algorithm;
     var msg = $('add-msg');
     msg.className = 'hint';
-    msg.textContent = '已识别：' + (p.issuer ? p.issuer + ' / ' : '') + p.account +
-      '（' + p.digits + '位 / ' + p.period + 's / ' + p.algorithm + '），确认后点「添加」。';
+    msg.textContent = t('addMsg.parsed', {
+      who: (p.issuer ? p.issuer + ' / ' : '') + p.account,
+      digits: p.digits, period: p.period, algo: p.algorithm
+    });
   }
 
   function onDetected(text){
@@ -1327,12 +1430,12 @@ if (typeof module !== 'undefined' && module.exports){
     msg.className = 'hint';
     if (/^otpauth:\/\//i.test(text)){
       try { applyParsed(parseOtpauthUri(text)); }
-      catch (e){ msg.className = 'hint err'; msg.textContent = '识别到链接但解析失败：' + e.message; }
+      catch (e){ msg.className = 'hint err'; msg.textContent = t('err.parseFailed', { msg: e.message }); }
     } else {
-      msg.textContent = '识别到内容已填入 Secret 输入框（非 otpauth 链接，请确认是否为 Secret）。';
+      msg.textContent = t('addMsg.detectedRaw');
     }
     $('add-panel').classList.remove('hidden');
-    toast('识别成功');
+    toast(t('toast.detected'));
   }
 
   // 粘贴 otpauth 链接时即时解析并回填（与扫码行为一致）
@@ -1345,7 +1448,7 @@ if (typeof module !== 'undefined' && module.exports){
     catch (e){
       var msg = $('add-msg');
       msg.className = 'hint err';
-      msg.textContent = '链接解析失败：' + e.message;
+      msg.textContent = t('err.linkParseFailed', { msg: e.message });
     }
   });
   function stopScan(){
@@ -1355,13 +1458,13 @@ if (typeof module !== 'undefined' && module.exports){
 
   $('btn-scan').addEventListener('click', async function(){
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      toast('无法访问摄像头（需 https 或 localhost）；可改用「图片」识别或手动输入'); return;
+      toast(t('toast.noCamera')); return;
     }
     openModal(
-      '<h3>扫描二维码</h3>' +
+      '<h3>' + t('scan.title') + '</h3>' +
       '<video id="scan-video" autoplay muted playsinline></video>' +
-      '<div class="tip">将二维码对准摄像头。若无法启动摄像头，请关闭后用「图片」选择二维码截图。</div>' +
-      '<div class="foot"><button class="btn" id="scan-cancel">取消</button></div>'
+      '<div class="tip">' + t('scan.tip') + '</div>' +
+      '<div class="foot"><button class="btn" id="scan-cancel">' + t('btn.cancel') + '</button></div>'
     );
     var video = $('scan-video');
     $('scan-cancel').onclick = function(){ stopScan(); closeModal(); };
@@ -1371,7 +1474,9 @@ if (typeof module !== 'undefined' && module.exports){
       await video.play();
     } catch (e){
       stopScan(); closeModal();
-      toast('摄像头启动失败：' + (e && e.name === 'NotAllowedError' ? '权限被拒绝' : (e && e.message) || '未知错误'));
+      toast(t('toast.cameraFailed', {
+        reason: (e && e.name === 'NotAllowedError') ? t('err.permissionDenied') : ((e && e.message) || t('err.unknown'))
+      }));
       return;
     }
     (function loop(){
@@ -1393,16 +1498,22 @@ if (typeof module !== 'undefined' && module.exports){
     var file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    toast('识别中…');
+    toast(t('toast.detecting'));
     try {
       var src = await loadImageSource(file);
       var text = await detectQr(src);
       if (src && src.close) src.close();
       if (text) onDetected(text);
-      else toast('未识别到二维码，请换一张清晰、完整的截图');
+      else toast(t('toast.noQrFound'));
     } catch (err){
-      toast('图片识别失败：' + ((err && err.message) || '未知错误'));
+      toast(t('toast.imageFailed', { msg: (err && err.message) || t('err.unknown') }));
     }
+  });
+
+  /* ---------- 语言切换 ---------- */
+  // 只打了一种语言包时（如 --lang=zh 单语构建）没有可切换的目标，直接隐藏按钮
+  $('btn-lang').addEventListener('click', function(){
+    setLocale(LOCALE === 'zh' ? 'en' : 'zh');
   });
 
   /* ---------- 启动 ---------- */
@@ -1411,7 +1522,16 @@ if (typeof module !== 'undefined' && module.exports){
   if (window.matchMedia && window.matchMedia('(max-width:720px)').matches){
     addOpen = false;
   }
+  // 静态 markup 里写的是中文基线，这里按当前语言覆盖一遍；动态内容由 render() 用 t() 生成
+  applyI18n();
   render();
+  // 之后每次切换语言，除了静态 markup，动态文案（提示条、卡片按钮等）也要重跑一遍
+  window.__i18nPostApply = function(){
+    applyEnvWarn();
+    hideToast();
+    applyPanelVisibility();
+    render();
+  };
 
   /*__SELFTEST_START__*/
   // 自测入口：控制台执行 selfTestOTP()（构建产物会剥离，仅源码保留用于审计/调试）

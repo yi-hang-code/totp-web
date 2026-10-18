@@ -16,6 +16,8 @@
  *   - 测试脚本（tools/*.mjs）绝不会被打进产物；dist 只含应用本体。
  *   - 源码中的 window.selfTestOTP 自检块（__SELFTEST_START__/END__ 标记）仅在源码保留，
  *     供审计/控制台调试；构建产物中自动剥离，不污染下发文件。
+ *   - 语言包与 index.html 解耦：词条放在 src/i18n/<lang>.js，index.html 只留
+ *     __I18N_PACKS__ 占位，构建时按需注入（默认 zh,en；--lang=zh 只打一种）。
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -31,6 +33,11 @@ const PLACEHOLDER = '/*__JSQR_INLINE__*/';
 const RE = /(<script id="jsqr-lib">)([\s\S]*?)(<\/script>)/;
 // 自检代码（window.selfTestOTP）仅用于源码审计/控制台调试，产物中剥离
 const SELF_RE = /\/\*__SELFTEST_START__\*\/[\s\S]*?\/\*__SELFTEST_END__\*\//;
+// 语言包与 index.html 解耦：源码只留 __I18N_PACKS__ 占位，构建时按需注入
+const I18N_DIR = join(root, 'src', 'i18n');
+const I18N_PLACEHOLDER = '/*__I18N_PACKS__*/';
+const langArg = (process.argv.find(function (a) { return a.indexOf('--lang=') === 0; }) || '').slice(7);
+const LANGS = langArg ? langArg.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : ['zh', 'en'];
 const rebuild = process.argv.includes('--rebuild-jsqr');
 const minify = process.argv.includes('--min');
 
@@ -82,7 +89,7 @@ async function minifyHtml(html) {
       const id = (b.attrs.match(/id="([^"]+)"/) || [])[1] || '';
       if (/application\/ld\+json/.test(b.attrs)) {
         b.out = JSON.stringify(JSON.parse(b.content));
-      } else if (id === 'core-lib' || id === 'app') {
+      } else if (id === 'core-lib' || id === 'app' || id === 'i18n-lib') {
         b.out = await minifyJS(b.content);
       } else {
         b.out = b.content; // jsqr-lib 等已压缩
@@ -119,6 +126,19 @@ if (SELF_RE.test(html)) {
 } else {
   console.warn('注意：未在源码中找到 __SELFTEST__ 标记块，自检代码可能已移除或标记被改。');
 }
+
+// 注入语言包（按需：默认中英双语；--lang=zh 只打中文，--lang=zh,en,ja 指定多种）
+let packs = '';
+for (const l of LANGS) {
+  const f = join(I18N_DIR, l + '.js');
+  if (!existsSync(f)) throw new Error('缺少语言包: src/i18n/' + l + '.js');
+  packs += readFileSync(f, 'utf8').trim() + '\n';
+}
+if (!html.includes(I18N_PLACEHOLDER)) {
+  throw new Error('index.html 中未找到 ' + I18N_PLACEHOLDER + ' 占位（构建脚本不会改写源码）');
+}
+html = html.replace(I18N_PLACEHOLDER, packs);
+console.log('已注入语言包:', LANGS.join(', '));
 
 if (minify) {
   const t0 = Date.now();
