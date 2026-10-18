@@ -1,0 +1,88 @@
+# TOTP-Web 持续集成
+# 每次 push / PR：密钥扫描 + 全量测试 + 保存单文件产物
+#
+# 注意（2026）：GitHub 已于 2026-09-16 将 Node 20 从 hosted runners 中彻底移除，
+# 所有 action 都必须使用 Node 24 运行时的版本，否则直接失败：
+#   actions/checkout@v6 / actions/setup-node@v6 / actions/upload-artifact@v7
+# 网上大量教程仍在用 checkout@v4、setup-node@v4，那些写法现在已经跑不起来。
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+# 最小权限：CI 只读代码，不发版、不写仓库
+permissions:
+  contents: read
+
+# 同一分支有新提交时取消旧的进行中任务，省配额
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # gitleaks CLI 版本，与官方 latest release 保持一致；升级时改这一行
+  GITLEAKS_VERSION: 8.30.1
+
+jobs:
+  secret-scan:
+    name: 密钥扫描 · gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # 完整历史，才能扫到旧提交里的泄漏
+
+      # 直接跑官方 CLI 而非 gitleaks-action：CLI 仍是 MIT（与本项目许可一致），
+      # 而 gitleaks-action 自 v2 起改为专有许可，组织账号还需申请 license key
+      - name: 安装 gitleaks CLI
+        run: |
+          set -euo pipefail
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          chmod +x /usr/local/bin/gitleaks
+
+      # 两条命令与本地开发完全一致；必须显式 --config：
+      # 仓库配置叫 .gitleaks.toml（带点前缀），不放行 RFC 6238 公开测试向量会误报
+      - name: 扫描工作区（含构建产物）
+        run: gitleaks dir . -v --config .gitleaks.toml --redact
+
+      - name: 扫描 git 历史
+        run: gitleaks git . -v --config .gitleaks.toml --redact
+
+  test:
+    name: 测试 · Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # = build + verify(算法 45 条) + smoke(jsdom 145 条) + i18n-check(词条一致性)
+      - name: 全量测试
+        run: npm test
+
+      # 只在最低版本上存一份产物，避免重复占用存储空间
+      - name: 上传单文件产物
+        if: matrix.node == '22'
+        uses: actions/upload-artifact@v7
+        with:
+          name: totp-web-dist
+          path: dist/index.html
+          if-no-files-found: error
