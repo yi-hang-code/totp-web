@@ -1,0 +1,63 @@
+# TOTP-Web 发版流水线
+# 推送 v* tag 时：校验版本一致性 → 全量测试 → 构建压缩版 → 发布 Release 附件
+#
+# 用法：
+#   1. 改 package.json 的 version（如 1.2.0）并提交
+#   2. git tag v1.2.0 && git push origin v1.2.0
+#   3. 本流水线会先校验 tag 与 package.json 一致，不一致直接失败
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # 需要创建 Release 并上传附件
+
+jobs:
+  release:
+    name: 构建并发版
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # 与 smoke 里的版本号断言配合，保证 package.json / 页面 JSON-LD / Release tag 三处不脱节
+      - name: 校验 tag 与 package.json 版本一致
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag = v${TAG} / package.json = ${PKG}"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v${TAG} 与 package.json 的 ${PKG} 不一致，请先同步版本号"
+            exit 1
+          fi
+
+      - name: 全量测试
+        run: npm test
+
+      - name: 构建压缩版
+        run: npm run build:min
+
+      # 用 runner 自带的 gh CLI，不引入第三方 action（避免供应链与许可风险）
+      - name: 创建 Release 并上传单文件产物
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          cp dist/index.html "totp-web-v${VER}.html"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "TOTP-Web v${VER}" \
+            --generate-notes \
+            --latest \
+            "totp-web-v${VER}.html"
