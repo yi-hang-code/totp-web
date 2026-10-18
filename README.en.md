@@ -100,6 +100,34 @@ npm test         # = build + verify + smoke + i18n-check
 
 ---
 
+## Continuous Integration (CI / CD)
+
+The repository ships three pipelines:
+
+| Platform | File | Trigger | What it does |
+|---|---|---|---|
+| GitHub Actions | `.github/workflows/ci.yml` | push / PR (`master`, `main`) | gitleaks secret scan (working tree + git history); `npm test` on a Node 22 / 24 matrix; stores `dist/index.html` as an artifact on Node 22 |
+| GitHub Actions | `.github/workflows/release.yml` | `v*` tag push | verifies the tag matches `package.json` -> full test suite -> minified build -> creates a Release with the single-file build attached (via `gh`) |
+| Gitee Go | `.workflow/ci.yml` | push (`master`) | `npm ci` + `npm test`, stores `dist` as an artifact |
+
+**Gotchas worth knowing:**
+
+- GitHub removed Node 20 from hosted runners on 2026-09-16, so the workflows pin `actions/checkout@v6`, `actions/setup-node@v6` and `actions/upload-artifact@v7`. The `@v4` style still shown in most tutorials now fails outright.
+- Secret scanning runs the gitleaks CLI directly instead of `gitleaks-action`: the CLI is still MIT (matching this project's license), while the action has been proprietary since v2 and needs a license key for organization accounts. The command is identical to the local one, and it **must pass `--config .gitleaks.toml` explicitly** — the config file has a leading dot, and without it the RFC 6238 public test vector is reported as a leak.
+- Gitee Go only reads `.workflow/` after you **enable the service** in the repo's "DevOps / Pipelines" page; committing the YAML alone does nothing. Its Node version list also differs from GitHub's — if the log says 22 is unavailable, change `inputs.nodeVersion`. Gitee does not run gitleaks, to avoid a pipeline failing on network access rather than on code.
+
+**Releasing:**
+
+```bash
+# 1. bump "version" in package.json (and softwareVersion in the JSON-LD) and commit
+# 2. push a matching tag
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+The release pipeline fails if the tag and `package.json` disagree, so `package.json`, the JSON-LD `softwareVersion` and the Release tag cannot drift apart.
+
+---
+
 ## Project Structure
 
 ```
@@ -117,6 +145,11 @@ npm test         # = build + verify + smoke + i18n-check
 │   └── i18n-check.mjs  # Key consistency check (source keys <-> language packs)
 ├── scripts/
 │   └── build.mjs       # Build script: injects jsQR + language packs -> dist/index.html
+├── .github/workflows/  # GitHub Actions
+│   ├── ci.yml          # Secret scan + matrix tests + artifact
+│   └── release.yml     # Tag v* -> verify version, test, publish Release
+├── .workflow/
+│   └── ci.yml          # Gitee Go pipeline (enable the service in repo settings first)
 ├── .gitleaks.toml      # Allows the RFC 6238 public test vector (not a real secret)
 ├── package.json
 ├── LICENSE             # MIT

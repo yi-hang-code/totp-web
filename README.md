@@ -100,6 +100,34 @@ npm test         # = build + verify + smoke + i18n-check
 
 ---
 
+## 持续集成（CI / CD）
+
+仓库自带三套流水线：
+
+| 平台 | 文件 | 触发 | 做什么 |
+|---|---|---|---|
+| GitHub Actions | `.github/workflows/ci.yml` | push / PR（`master`、`main`） | gitleaks 密钥扫描（工作区 + git 历史）；Node 22 / 24 矩阵跑 `npm test`；在 Node 22 上把 `dist/index.html` 存为 artifact |
+| GitHub Actions | `.github/workflows/release.yml` | 推送 `v*` tag | 校验 tag 与 `package.json` 版本一致 → 全量测试 → 构建压缩版 → 用 `gh` 创建 Release 并上传单文件产物 |
+| Gitee Go | `.workflow/ci.yml` | push（`master`） | `npm ci` + `npm test`，并把 `dist` 存为制品 |
+
+**几个容易踩的点：**
+
+- GitHub 已于 2026-09-16 把 Node 20 从 runners 中彻底移除，所以工作流固定使用 `actions/checkout@v6`、`actions/setup-node@v6`、`actions/upload-artifact@v7`——网上教程里常见的 `@v4` 写法现在会直接失败。
+- 密钥扫描直接跑 gitleaks CLI 而非 `gitleaks-action`：CLI 仍是 MIT（与本项目许可一致），action 自 v2 起改为专有许可、组织账号还需 license key。扫描命令与本地完全一致，且**必须显式 `--config .gitleaks.toml`**——仓库配置是带点前缀的文件名，不放行 RFC 6238 公开测试向量会误报。
+- Gitee Go 需要在仓库「DevOps / 流水线」页面**开通服务**后才会读取 `.workflow/`，仅提交 YAML 不会生效；其 Node 版本列表与 GitHub 不完全一致，若构建日志提示 22 不可用，改 `inputs.nodeVersion` 即可。Gitee 侧不跑 gitleaks，避免境外下载导致流水线因网络失败。
+
+**发版：**
+
+```bash
+# 1. 改 package.json 的 version 并提交（页面 JSON-LD 的 softwareVersion 要同步）
+# 2. 打同名 tag 并推送
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+tag 与 `package.json` 版本不一致时流水线会直接失败，避免 `package.json` / 页面 JSON-LD / Release tag 三处脱节。
+
+---
+
 ## 项目结构
 
 ```
@@ -117,6 +145,11 @@ npm test         # = build + verify + smoke + i18n-check
 │   └── i18n-check.mjs  # 词条一致性检查（源码 key ↔ 各语言包）
 ├── scripts/
 │   └── build.mjs       # 构建脚本：注入 jsQR + 语言包 → dist/index.html
+├── .github/workflows/  # GitHub Actions
+│   ├── ci.yml          # 密钥扫描 + 矩阵测试 + 产物
+│   └── release.yml     # tag v* 触发：校验版本 → 测试 → 发 Release
+├── .workflow/
+│   └── ci.yml          # Gitee Go 流水线（需先在仓库后台开通服务）
 ├── .gitleaks.toml      # 放行 RFC 6238 公开测试向量（非真实密钥）
 ├── package.json
 ├── LICENSE             # MIT
