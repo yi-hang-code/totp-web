@@ -1,0 +1,14 @@
+# .gitleaks.toml
+# 自定义 gitleaks 配置：在默认规则基础上，对「已知、非敏感」的公开测试向量放行，
+# 避免安全扫描误报阻断提交/CI。真实密钥仍会被默认规则捕获。
+
+[extend]
+# 继承 gitleaks 内置默认规则集
+useDefault = true
+
+[allowlist]
+description = "RFC 6238 公开测试向量（Appendix B 种子）：Base32('12345678901234567890')，仅用于 window.selfTestOTP() 自检，并非真实密钥。若日后出现真实密钥泄漏，此放行规则不会掩盖其它任意字符串。"
+regexes = [
+  # 精确匹配该公开向量的 Base32 编码（40 字符，足够特异，不会误伤真实密钥）
+  "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+]

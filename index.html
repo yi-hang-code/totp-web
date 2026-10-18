@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- 纵深防御：页面无任何外部资源，禁止一切对外连接与外链脚本。
+     即使将来出现注入点，也无法把数据发送到任何地方（connect-src 'none'）。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'" />
+<meta name="referrer" content="no-referrer" />
+  <title>TOTP-Web · 纯前端 TOTP 身份验证器（离线 / 开源 / 零网络）</title>
+  <meta name="description" content="TOTP-Web 是一个纯浏览器前端的 TOTP（RFC 6238）身份验证器：多账户管理、二维码扫描、主密码（PBKDF2 + AES-GCM）加密本地存储。所有计算在本机完成，零网络、可离线、MIT 开源，Secret 永不离开你的设备。" />
+  <meta name="keywords" content="TOTP,动态口令,身份验证器,2FA,两步验证,RFC 6238,HOTP,Authenticator,离线,开源,纯前端,二维码,主密码加密" />
+  <meta name="author" content="TOTP-Web contributors" />
+  <meta name="robots" content="index,follow" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="application-name" content="TOTP-Web" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="TOTP-Web" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="TOTP-Web · 纯前端 TOTP 身份验证器" />
+  <meta property="og:description" content="纯浏览器前端的 TOTP 身份验证器：离线运行、零网络、主密码加密、MIT 开源。多账户管理 + 二维码扫描，Secret 永不离开本机。" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="TOTP-Web · 纯前端 TOTP 身份验证器" />
+  <meta name="twitter:description" content="纯浏览器前端的 TOTP 身份验证器：离线运行、零网络、主密码加密、MIT 开源。" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TOTP-Web",
+    "alternateName": "纯前端 TOTP 身份验证器",
+    "description": "纯浏览器前端的 TOTP (RFC 6238) 身份验证器：多账户管理、二维码扫描、主密码（PBKDF2 + AES-GCM）加密本地存储。零网络、可离线、MIT 开源。",
+    "applicationCategory": "UtilitiesApplication",
+    "applicationSubCategory": "Security/Authentication",
+    "operatingSystem": "Any modern web browser",
+    "softwareVersion": "1.0.0",
+    "inLanguage": ["zh-CN", "en"],
+    "isAccessibleForFree": true,
+    "license": "https://opensource.org/licenses/MIT",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "TOTP (RFC 6238) / HOTP (RFC 4226)",
+      "多账户管理",
+      "二维码扫描与上传识别",
+      "主密码加密（PBKDF2-HMAC-SHA256 + AES-GCM-256）",
+      "零网络 / 离线可用",
+      "MIT 开源"
+    ]
+  }
+  </script>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --border:#e5e7eb; --border-2:#d1d5db;
+    --text:#111827; --muted:#6b7280; --primary:#2563eb; --primary-weak:#eff6ff;
+    --danger:#dc2626; --danger-weak:#fef2f2; --ok:#059669;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1140px;margin:0 auto;padding:22px 24px 32px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace}
+
+  /* ---------- header ---------- */
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+  header.top h1{font-size:19px;margin:0;letter-spacing:.3px}
+  header.top .sub{color:var(--muted);font-size:12px;margin:2px 0 0}
+  .top-actions{display:flex;gap:8px}
+
+  /* ---------- buttons / inputs ---------- */
+  .btn{
+    border:1px solid var(--border-2);background:#fff;color:var(--text);
+    padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;
+    transition:background .12s,border-color .12s;white-space:nowrap;
+  }
+  .btn:hover{background:#f9fafb;border-color:#9ca3af}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+  .btn.ghost{border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:#eef0f3;color:var(--text)}
+  .btn.danger{color:var(--danger);border-color:#f3c3c3}
+  .btn.danger:hover{background:var(--danger-weak)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.sm{padding:3px 9px;font-size:12px;border-radius:6px}
+
+  input[type=text],input[type=number],input[type=password],select{
+    border:1px solid var(--border-2);background:#fff;color:var(--text);
+    padding:6px 9px;border-radius:8px;font-size:13px;outline:none;width:100%;
+  }
+  input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  label.f{display:block}
+  label.f > span{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+
+  /* ---------- add panel ---------- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+  .add-panel{padding:12px;margin-bottom:14px}
+  .form-row{display:grid;grid-template-columns:1fr 240px auto;gap:10px;align-items:end}
+  .form-row .btns{display:flex;gap:6px;flex-wrap:wrap}
+  .adv{margin-top:10px;display:grid;grid-template-columns:repeat(3,120px);gap:10px}
+  .adv-toggle{margin-top:9px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .hint.err{color:var(--danger)}
+  .hidden{display:none !important}
+
+  /* ---------- 引导 / 提示条 ---------- */
+  .onboard{padding:26px 30px;max-width:none;margin-bottom:14px;
+    display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;align-items:start}
+  .onboard h3{font-size:19px;margin:0 0 10px;grid-column:1 / -1}
+  .onboard > p{grid-column:1 / -1}
+  .onboard p{font-size:13.5px;color:var(--muted);line-height:1.8;margin:0 0 10px}
+  .onboard ul{margin:0;padding-left:20px;font-size:13px;color:var(--text);line-height:2}
+  .onboard ul b{color:#b45309}
+  .onboard .cta{border-left:1px solid var(--border);padding-left:24px}
+  .onboard .cta .btn{width:100%;min-height:42px;font-size:14px}
+  .onboard .tip{font-size:12px;margin:10px 0 0;text-align:center;color:var(--muted)}
+  .warnbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:9px 12px;margin-bottom:12px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px}
+  .warnbar button{margin-left:auto}
+  .pw-ack{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.6;
+    background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:9px 10px;border-radius:8px;margin-top:10px}
+  .pw-ack input{width:16px;height:16px;margin-top:2px;flex:none;accent-color:#2563eb}
+
+  /* ---------- 锁屏 ---------- */
+  /* 注意：.warnbar 在 720px 断点内有 max-width:460px，这里用更高优先级覆盖，避免桌面被限宽 */
+  footer #sec-note.warnbar{max-width:none;width:100%;display:block;line-height:1.75}
+  .lock{padding:20px 22px;max-width:520px;margin:0 auto 14px;text-align:center}
+  .lock .lock-head{font-weight:600;font-size:15px;margin-bottom:6px}
+  .lock .tip{font-size:12px;color:var(--muted);line-height:1.7;margin:0 0 12px;text-align:left}
+  .lock .lock-row{display:flex;gap:8px}
+  .lock .lock-row input{flex:1}
+  .lock .lock-foot{margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);text-align:left}
+  .lock .hint{min-height:18px;margin-top:8px;text-align:left}
+
+  /* ---------- account grid ---------- */
+  .copy-tip{font-size:12px;color:#4b5563;margin:0 0 8px;display:inline-flex;align-items:center;gap:6px;
+    background:#f3f4f6;border:1px solid var(--border);border-radius:999px;padding:3px 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
+  .acc{padding:11px 12px;position:relative;display:flex;flex-direction:column;gap:7px;min-height:132px}
+  .acc .head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+  .acc .name{font-weight:600;font-size:13px;line-height:1.3;word-break:break-all}
+  .acc .issuer{font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+  .acc .x{border:0;background:transparent;color:#9ca3af;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:5px}
+  .acc .x:hover{color:var(--danger);background:var(--danger-weak)}
+  .acc .code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:31px;letter-spacing:5px;font-weight:600;text-align:center;
+    padding:2px 0;cursor:pointer;user-select:all;color:#0f172a;
+    position:relative;border-radius:8px;
+    transition:background .18s ease,color .18s ease,box-shadow .18s ease;
+  }
+  .acc .code.warn{color:var(--danger)}
+  /* 复制成功后的就地反馈：底部 toast 容易被忽略，直接在口令上盖一个“已复制”气泡 */
+  .acc .code.copied{background:#dcfce7;color:#14532d;box-shadow:0 0 0 4px #dcfce7}
+  .acc .code.copied::after{
+    content:'✓ 已复制';
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#16a34a;color:#fff;font-size:12px;font-weight:600;letter-spacing:0;
+    padding:3px 11px;border-radius:999px;white-space:nowrap;
+    box-shadow:0 3px 10px rgba(22,163,74,.35);
+    animation:copypop .18s ease-out;
+  }
+  @keyframes copypop{
+    from{opacity:0;transform:translate(-50%,-50%) scale(.86)}
+    to{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  }
+  .acc .bar-wrap{height:4px;background:#eef0f3;border-radius:3px;overflow:hidden}
+  .acc .bar{height:100%;background:var(--primary);width:100%;border-radius:3px;transition:width .2s linear}
+  .acc .bar.warn{background:var(--danger)}
+  .acc .meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);flex-wrap:wrap;gap:4px}
+  .acc .ops{display:flex;gap:6px}
+
+  /* ---------- 安全声明 ---------- */
+  .secbar{display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:12px;flex-wrap:wrap;
+    background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+  .secbar .badge{background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:1px 8px;font-size:12px;white-space:nowrap}
+  .secbar b{font-weight:600;font-size:13px;color:#14532d}
+  .secbar .spacer{flex:1}
+  .secbar button{color:#166534}
+  .secbar button:hover{background:#dcfce7}
+  #sec-detail{width:100%;margin-top:6px;font-size:12px;color:#374151;line-height:1.75;border-top:1px dashed #a7f3d0;padding-top:8px}
+  #sec-detail ul{margin:0;padding-left:18px}
+  #sec-detail li{margin:2px 0}
+  #sec-detail code{background:#f3f4f6;padding:1px 4px;border-radius:4px}
+
+  .empty{padding:44px 16px;text-align:center;color:var(--muted);border:1px dashed var(--border-2);border-radius:var(--radius);background:#fff}
+  .empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px;font-weight:600}
+
+  footer{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.7}
+  footer .warnbar{margin-bottom:8px;padding:8px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+
+  /* ---------- modal ---------- */
+  .modal{position:fixed;inset:0;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal .box{background:#fff;border-radius:12px;padding:14px;max-width:94vw;max-height:92vh;overflow:auto;box-shadow:0 12px 32px rgba(0,0,0,.18)}
+  .modal .box h3{margin:0 0 10px;font-size:15px}
+  .modal .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+  .modal video{width:min(78vw,420px);max-height:52vh;background:#111;border-radius:8px;display:block}
+  .modal canvas{border-radius:8px;display:block;image-rendering:pixelated}
+  .modal .tip{font-size:12px;color:var(--muted);margin-top:8px;max-width:420px}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+    background:#111827;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;
+    opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:99;max-width:80vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- 响应式：平板/手机 ---------- */
+  @media (max-width:720px){
+    .wrap{padding:12px 12px calc(22px + env(safe-area-inset-bottom,0px))}
+    header.top{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:12px}
+    header.top h1{font-size:17px}
+    .top-actions{display:flex;gap:8px}
+    .top-actions .btn{flex:1 1 calc(50% - 4px);min-height:38px}
+    .secbar{font-size:12px;gap:8px}
+    .secbar b{font-size:12.5px;flex:1;min-width:60%}
+
+    .add-panel{padding:10px}
+    .form-row{grid-template-columns:1fr;gap:8px}
+    .form-row .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .form-row .btns .btn{min-height:40px}
+    .adv{grid-template-columns:repeat(3,1fr);gap:8px}
+    .lock .lock-row{flex-direction:column}
+    .onboard{grid-template-columns:1fr;gap:14px;padding:18px}
+    .onboard .cta{border-left:0;border-top:1px solid var(--border);padding:14px 0 0}
+    /* iOS 聚焦输入框会自动放大页面，字号 >=16px 可避免 */
+    input[type=text],input[type=number],input[type=password],select{font-size:16px;padding:8px 10px;min-height:40px}
+    .btn{min-height:36px}
+
+    /* 移动端浏览器底部工具栏会盖住贴底的 toast，抬高并避开安全区 */
+    #toast{bottom:calc(34px + env(safe-area-inset-bottom,0px))}
+
+    .grid{grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+    .acc{min-height:0;padding:10px;gap:6px}
+    .acc .name{font-size:12.5px}
+    .acc .code{font-size:clamp(20px,4.4vw,31px);letter-spacing:.16em;padding:4px 0}
+    .acc .meta{flex-wrap:wrap;gap:4px}
+    .acc .ops .btn{min-height:32px;font-size:11px;padding:4px 8px}
+    .acc .x{font-size:19px;padding:4px 8px}
+
+    .modal{padding:10px;align-items:flex-start}
+    .modal .box{width:100%;padding:12px}
+    .modal video{width:100%;max-height:46vh}
+    .modal canvas{max-width:100%;height:auto}
+    .modal .foot .btn{min-height:40px;flex:1}
+    .modal .tip{max-width:none}
+  }
+  @media (max-width:400px){
+    .grid{grid-template-columns:1fr}
+    .adv{grid-template-columns:1fr 1fr}
+    .form-row .btns{grid-template-columns:1fr 1fr}
+    .form-row .btns .btn:last-child{grid-column:1 / -1}
+  }
+  /* 触屏反馈 */
+  @media (hover:none){
+    .btn:active{background:#e5e7eb}
+    .btn.primary:active{background:#1d4ed8}
+    .acc:active{background:#fafbfc}
+    .acc .code:active{background:#f3f4f6;border-radius:6px}
+    /* 触屏没有 hover，那行「点击复制」小字看不见也点不着，
+       改由卡片内「复制」按钮承担入口，这里省掉一行 */
+    .copy-tip{display:none}
+  }
+  /* 大屏：放宽内容宽度 */
+  @media (min-width:1280px){
+    .wrap{max-width:1180px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>TOTP 动态口令</h1>
+      <p class="sub">纯前端 · 零依赖 · 主密码加密后仅存本机浏览器</p>
+    </div>
+    <div class="top-actions">
+      <button id="btn-toggle-add" class="btn primary">+ 添加账户</button>
+      <button id="btn-crypto" class="btn">设置主密码</button>
+      <button id="btn-lock" class="btn hidden">锁定</button>
+      <button id="btn-clear" class="btn ghost">清空全部</button>
+    </div>
+  </header>
+
+  <div id="env-warn" class="card hidden" style="padding:10px 12px;margin-bottom:12px;border-color:#fde68a;background:#fffbeb;color:#92400e;font-size:13px"></div>
+
+  <section class="card secbar">
+    <span class="badge">纯本地运行</span>
+    <b>本页面不会向任何服务器发送数据，Secret 永不离开这台设备</b>
+    <span class="spacer"></span>
+    <button id="btn-sec-detail" class="btn sm ghost">自检详情 ▾</button>
+    <div id="sec-detail" class="hidden">
+      <ul>
+        <li><b>无后端</b>：页面没有任何服务端接口，口令由本机浏览器的 WebCrypto（HMAC-SHA1/256/512）在本地计算。</li>
+        <li><b>零网络</b>：自页面脚本运行以来，发起的网络请求 <span id="net-count" class="mono">0</span> 次（已覆盖 <code>fetch</code> / <code>XMLHttpRequest</code> / <code>WebSocket</code> / <code>sendBeacon</code>，可用 DevTools → Network 面板复核）。</li>
+        <li><b>存储位置</b>：账户与 Secret 只保存在本机浏览器的 <code>localStorage</code>（同源隔离、不上传），且<b>强制使用主密码加密</b> —— 现在添加的任何账户，落盘一律是 AES-GCM 密文，解密密钥由密码当场派生、随即丢弃，页面关闭/锁定后本机只剩密文（仅本版本之前遗留的历史明文数据例外，页面会提示你一次性加密）。忘记密码无法解密，请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。</li>
+        <li><b>二维码</b>：生成与识别都在本机完成 —— 绘制用内置编码器；识别优先用系统 <code>BarcodeDetector</code>（仅部分 Android/Chrome 可用），不可用时自动回退内置的 jsQR 解码库（Apache-2.0，已内联进本文件）。两者都不调用任何在线服务。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="add-panel" class="card add-panel">
+    <div class="form-row">
+      <label class="f">
+        <span>Secret / otpauth 链接（必填）</span>
+        <input id="in-secret" type="text" class="mono" placeholder="JBSWY3DPEHPK3PXP  或  otpauth://totp/..." autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="f">
+        <span>备注名称（可选，支持 服务商:账号）</span>
+        <input id="in-label" type="text" placeholder="GitHub:zhang@example.com" autocomplete="off" />
+      </label>
+      <div class="btns">
+        <button id="btn-scan" class="btn">扫码</button>
+        <button id="btn-pick" class="btn">图片</button>
+        <button id="btn-add" class="btn primary">添加</button>
+      </div>
+    </div>
+
+    <div class="adv-toggle"><button id="btn-adv" class="btn sm ghost">高级参数 ▾</button></div>
+    <div id="adv" class="adv hidden">
+      <label class="f"><span>位数 digits</span>
+        <select id="in-digits"><option>6</option><option>8</option></select>
+      </label>
+      <label class="f"><span>周期 period（秒）</span>
+        <input id="in-period" type="number" min="5" max="300" step="1" value="30" />
+      </label>
+      <label class="f"><span>算法 algorithm</span>
+        <select id="in-algo"><option>SHA1</option><option>SHA256</option><option>SHA512</option></select>
+      </label>
+    </div>
+
+    <div id="add-msg" class="hint">可直接粘贴 Google / Microsoft Authenticator 导出的 otpauth:// 链接，或手动输入 Base32 Secret。</div>
+  </section>
+
+  <section id="onboard-panel" class="card onboard hidden">
+    <h3>请先设置一个主密码</h3>
+    <p>Secret 会保存在这台设备的浏览器里。为防止任何人打开浏览器就直接看到，<b>本工具要求先设置主密码</b>：它只在本机加密你的 Secret，密码本身不会被保存。</p>
+    <ul>
+      <li>密码仅用于当场派生解密密钥，<b>不会被保存</b>，每次打开页面都要重新输入</li>
+      <li>遗忘后<b>无法找回</b> —— 只能清除本机浏览器数据并重新设置</li>
+      <li>解锁状态闲置 5 分钟会自动锁定</li>
+    </ul>
+    <div class="cta">
+      <button id="btn-onboard-set" class="btn primary">设置主密码</button>
+      <p class="tip">设置完成后即可添加第一个账户</p>
+    </div>
+  </section>
+
+  <div id="upgrade-tip" class="card warnbar hidden">
+    <b>建议设置主密码</b><span id="upgrade-text"></span>
+    <button id="btn-upgrade-set" class="btn sm">立即设置</button>
+  </div>
+
+  <section id="lock-panel" class="card lock hidden">
+    <div class="lock-head">本机浏览器数据已用主密码加密</div>
+    <p class="tip">主密码<b>不会以任何形式保存</b>，仅用于当场派生解密密钥；刷新或重开页面后需重新输入，闲置 5 分钟也会自动锁定。密码遗忘无法找回，只能清除本机浏览器数据后重新设置。</p>
+    <div class="lock-row">
+      <input id="in-master" type="password" placeholder="请输入主密码" autocomplete="current-password" spellcheck="false" />
+      <button id="btn-unlock" class="btn primary">解锁</button>
+    </div>
+    <div id="lock-msg" class="hint"></div>
+    <div class="lock-foot">
+      <button id="btn-wipe" class="btn danger sm">忘记密码？清除本机浏览器加密数据</button>
+    </div>
+  </section>
+
+  <div id="copy-tip" class="copy-tip hidden">点击卡片中的口令数字即可复制，复制后数字上会浮出「已复制」提示</div>
+  <section id="list" class="grid"></section>
+  <div id="empty" class="empty">
+    <b>还没有账户</b>
+    点击右上角「添加账户」，输入 Secret 或扫描二维码开始使用。
+  </div>
+
+  <footer>
+    <div id="sec-note" class="warnbar">安全提示：Secret 以主密码加密后保存在本机浏览器的 localStorage，密码本身不保存、遗忘无法找回；解锁后明文只在内存中，闲置 5 分钟自动锁定。忘记密码请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。</div>
+    <div>实现遵循 RFC 6238（TOTP）/ RFC 4226（HOTP 计数与截断）；时间取自本机系统时钟，若本机时间不准会导致验证码不匹配，请先校准系统时间。</div>
+  </footer>
+</div>
+
+<div id="modal" class="modal hidden"><div class="box" id="modal-box"></div></div>
+<div id="toast"></div>
+<input id="file-input" type="file" accept="image/*" class="hidden" />
+
+<script id="core-lib">
+/* ============================================================
+ * 核心库：Base32 / TOTP(RFC 6238) / otpauth URI / QR 编码器
+ * 无依赖，可单独在 Node 中执行用于自测
+ * ============================================================ */
+
+/* ---------- Base32 ---------- */
+var B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function normalizeSecret(s){
+  return String(s == null ? '' : s).toUpperCase().replace(/[\s\-\r\n\t]/g, '').replace(/=+$/, '');
+}
+function base32Decode(input){
+  var s = normalizeSecret(input);
+  if (!s) throw new Error('Secret 不能为空');
+  var bits = 0, value = 0, out = [];
+  for (var i = 0; i < s.length; i++){
+    var idx = B32.indexOf(s.charAt(i));
+    if (idx < 0) throw new Error('非法 Base32 字符 "' + s.charAt(i) + '"（Base32 只含 A-Z 与 2-7）');
+    value = (value << 5) | idx; bits += 5;
+    if (bits >= 8){ out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  return Uint8Array.from(out);
+}
+
+/* ---------- TOTP ---------- */
+var ALGO_MAP = { 'SHA1':'SHA-1', 'SHA256':'SHA-256', 'SHA512':'SHA-512' };
+function counterBytes(counter){
+  var b = new Uint8Array(8), c = counter;
+  for (var i = 7; i >= 0; i--){ b[i] = c % 256; c = Math.floor(c / 256); }
+  return b;
+}
+async function hmacBytes(keyBytes, msgBytes, algo){
+  var hash = ALGO_MAP[String(algo || 'SHA1').toUpperCase()] || 'SHA-1';
+  var key = await crypto.subtle.importKey('raw', keyBytes, { name:'HMAC', hash:hash }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, msgBytes));
+}
+async function generateTOTP(secret, opts, timeMs){
+  opts = opts || {};
+  var period = Number(opts.period) || 30;
+  var digits = Number(opts.digits) || 6;
+  var algo = String(opts.algorithm || 'SHA1').toUpperCase();
+  var t = (timeMs == null ? Date.now() : timeMs);
+  if (digits !== 6 && digits !== 8) throw new Error('digits 只能是 6 或 8');
+  if (!(period >= 5 && period <= 300)) throw new Error('period 需在 5-300 秒之间');
+  var key = base32Decode(secret);
+  var counter = Math.floor(t / 1000 / period);
+  var mac = await hmacBytes(key, counterBytes(counter), algo);
+  var offset = mac[mac.length - 1] & 0x0f;
+  var bin = ((mac[offset] & 0x7f) << 24) | (mac[offset + 1] << 16) | (mac[offset + 2] << 8) | mac[offset + 3];
+  var mod = Math.pow(10, digits);
+  return String(bin % mod).padStart(digits, '0');
+}
+
+/* ---------- otpauth:// URI ---------- */
+function parseOtpauthUri(uri){
+  var raw = String(uri || '').trim();
+  var m = /^otpauth:\/\/(totp|hotp)\/([^?]*)(?:\?([\s\S]*))?$/i.exec(raw);
+  if (!m) throw new Error('不是合法的 otpauth:// 链接');
+  var type = m[1].toLowerCase();
+  var label = '';
+  try { label = decodeURIComponent(m[2] || ''); } catch (e) { label = m[2] || ''; }
+  var q = new URLSearchParams(m[3] || '');
+  var secret = (q.get('secret') || '').trim();
+  if (!secret) throw new Error('链接中缺少 secret 参数');
+  base32Decode(secret); // 提前校验
+  var issuer = (q.get('issuer') || '').trim();
+  var account = label;
+  var c = label.indexOf(':');
+  if (c > 0){
+    if (!issuer) issuer = label.slice(0, c);
+    account = label.slice(c + 1);
+  }
+  var out = {
+    type: type, secret: normalizeSecret(secret),
+    issuer: issuer.trim(), account: account.trim(),
+    digits: 6, period: 30, algorithm: 'SHA1'
+  };
+  var d = parseInt(q.get('digits'), 10);
+  if (d === 6 || d === 8) out.digits = d;
+  var p = parseInt(q.get('period'), 10);
+  if (p >= 5 && p <= 300) out.period = p;
+  var a = String(q.get('algorithm') || '').toUpperCase();
+  if (ALGO_MAP[a]) out.algorithm = a;
+  return out;
+}
+function buildOtpauthUri(acc){
+  var issuer = (acc.issuer || '').trim();
+  var account = (acc.account || '').trim();
+  var label = issuer ? issuer + ':' + account : account;
+  var q = new URLSearchParams();
+  q.set('secret', acc.secret);
+  if (issuer) q.set('issuer', issuer);
+  if (Number(acc.digits) !== 6) q.set('digits', String(acc.digits));
+  if (Number(acc.period) !== 30) q.set('period', String(acc.period));
+  if (String(acc.algorithm).toUpperCase() !== 'SHA1') q.set('algorithm', String(acc.algorithm).toUpperCase());
+  return 'otpauth://totp/' + encodeURIComponent(label).replace(/%3A/g, ':') + '?' + q.toString();
+}
+
+/* ---------- QR 编码器（Byte mode / 纠错等级 M / 版本 1-10） ---------- */
+var QR = (function(){
+  var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  (function(){
+    var x = 1;
+    for (var i = 0; i < 255; i++){ EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11d; }
+    for (var j = 255; j < 512; j++) EXP[j] = EXP[j - 255];
+  })();
+  function gmul(a, b){ return (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]]; }
+  function genPoly(deg){
+    var p = [1];
+    for (var i = 0; i < deg; i++){
+      var q = new Array(p.length + 1).fill(0);
+      for (var j = 0; j < p.length; j++){ q[j] ^= p[j]; q[j + 1] ^= gmul(p[j], EXP[i]); }
+      p = q;
+    }
+    return p;
+  }
+  function rsRemainder(data, deg){
+    var g = genPoly(deg), res = new Uint8Array(data.length + deg);
+    res.set(data);
+    for (var i = 0; i < data.length; i++){
+      var coef = res[i];
+      if (coef !== 0) for (var j = 1; j < g.length; j++) res[i + j] ^= gmul(g[j], coef);
+    }
+    return res.slice(data.length);
+  }
+
+  // [每块EC码字数, [[块数, 每块数据码字], ...]]
+  var EC_M = [
+    null,
+    { ec:10, blocks:[[1,16]] },
+    { ec:16, blocks:[[1,28]] },
+    { ec:26, blocks:[[1,44]] },
+    { ec:18, blocks:[[2,32]] },
+    { ec:24, blocks:[[2,43]] },
+    { ec:16, blocks:[[4,27]] },
+    { ec:18, blocks:[[4,31]] },
+    { ec:22, blocks:[[2,38],[2,39]] },
+    { ec:22, blocks:[[3,36],[2,37]] },
+    { ec:26, blocks:[[4,43],[1,44]] }
+  ];
+  var ALIGN = [null,null,[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+
+  function dataCodewords(v){ return EC_M[v].blocks.reduce(function(s,b){ return s + b[0]*b[1]; }, 0); }
+  function capacityBits(v){ return dataCodewords(v) * 8; }
+  function overheadBits(v){ return 4 + (v < 10 ? 8 : 16); }
+
+  function encode(text){
+    var bytes = new TextEncoder().encode(String(text));
+    var version = 0;
+    for (var v = 1; v <= 10; v++){
+      if (capacityBits(v) - overheadBits(v) >= bytes.length * 8){ version = v; break; }
+    }
+    if (!version) throw new Error('内容过长（>213 字节），无法生成二维码');
+
+    var bits = [];
+    function push(val, len){ for (var i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); }
+    push(0b0100, 4);
+    push(bytes.length, version < 10 ? 8 : 16);
+    for (var i = 0; i < bytes.length; i++) push(bytes[i], 8);
+
+    var cap = capacityBits(version);
+    for (var t = 0; t < 4 && bits.length < cap; t++) bits.push(0);
+    while (bits.length % 8 !== 0) bits.push(0);
+    var pad = [0xEC, 0x11], pi = 0;
+    while (bits.length < cap) push(pad[pi++ % 2], 8);
+
+    var dataBytes = [];
+    for (var b = 0; b < bits.length; b += 8){
+      var by = 0;
+      for (var k = 0; k < 8; k++) by = ((by << 1) | bits[b + k]) & 0xff;
+      dataBytes.push(by);
+    }
+
+    // 分块 + 纠错 + 交织
+    var cfg = EC_M[version], sizes = [];
+    cfg.blocks.forEach(function(spec){ for (var n = 0; n < spec[0]; n++) sizes.push(spec[1]); });
+    var dBlocks = [], eBlocks = [], off = 0;
+    sizes.forEach(function(sz){
+      var d = Uint8Array.from(dataBytes.slice(off, off + sz)); off += sz;
+      dBlocks.push(d); eBlocks.push(rsRemainder(d, cfg.ec));
+    });
+    var out = [], maxData = Math.max.apply(null, sizes);
+    for (var i2 = 0; i2 < maxData; i2++)
+      for (var b2 = 0; b2 < dBlocks.length; b2++)
+        if (i2 < dBlocks[b2].length) out.push(dBlocks[b2][i2]);
+    for (var i3 = 0; i3 < cfg.ec; i3++)
+      for (var b3 = 0; b3 < eBlocks.length; b3++) out.push(eBlocks[b3][i3]);
+
+    // ---- 矩阵 ----
+    var size = version * 4 + 17;
+    var mod = [], fn = [];
+    for (var r = 0; r < size; r++){ mod.push(new Uint8Array(size)); fn.push(new Uint8Array(size)); }
+    function setFn(x, y, dark){ mod[y][x] = dark ? 1 : 0; fn[y][x] = 1; }
+    function getBit(val, i){ return ((val >>> i) & 1) !== 0; }
+
+    for (var i4 = 0; i4 < size; i4++){ setFn(6, i4, i4 % 2 === 0); setFn(i4, 6, i4 % 2 === 0); }
+    function drawFinder(cx, cy){
+      for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++){
+        var dist = Math.max(Math.abs(dx), Math.abs(dy)), xx = cx + dx, yy = cy + dy;
+        if (xx >= 0 && xx < size && yy >= 0 && yy < size) setFn(xx, yy, dist !== 2 && dist !== 4);
+      }
+    }
+    drawFinder(3, 3); drawFinder(size - 4, 3); drawFinder(3, size - 4);
+
+    var pos = ALIGN[version] || [];
+    for (var ai = 0; ai < pos.length; ai++) for (var aj = 0; aj < pos.length; aj++){
+      if ((ai === 0 && aj === 0) || (ai === 0 && aj === pos.length - 1) || (ai === pos.length - 1 && aj === 0)) continue;
+      (function(px, py){
+        for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++)
+          setFn(px + dx, py + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+      })(pos[ai], pos[aj]);
+    }
+
+    function drawFormatBits(fb){
+      for (var i = 0; i <= 5; i++) setFn(8, i, getBit(fb, i));
+      setFn(8, 7, getBit(fb, 6)); setFn(8, 8, getBit(fb, 7)); setFn(7, 8, getBit(fb, 8));
+      for (var i2 = 9; i2 < 15; i2++) setFn(14 - i2, 8, getBit(fb, i2));
+      for (var i3 = 0; i3 < 8; i3++) setFn(size - 1 - i3, 8, getBit(fb, i3));
+      for (var i4 = 8; i4 < 15; i4++) setFn(8, size - 15 + i4, getBit(fb, i4));
+      setFn(8, size - 8, true);
+    }
+    drawFormatBits(0);
+
+    if (version >= 7){
+      var rem = version;
+      for (var i5 = 0; i5 < 12; i5++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+      var vbits = (version << 12) | rem;
+      for (var i6 = 0; i6 < 18; i6++){
+        var bit = getBit(vbits, i6), a = size - 11 + i6 % 3, b = Math.floor(i6 / 3);
+        setFn(a, b, bit); setFn(b, a, bit);
+      }
+    }
+
+    var idx = 0;
+    for (var right = size - 1; right >= 1; right -= 2){
+      if (right === 6) right = 5;
+      for (var vert = 0; vert < size; vert++){
+        for (var jj = 0; jj < 2; jj++){
+          var x = right - jj;
+          var upward = ((right + 1) & 2) === 0;
+          var y = upward ? size - 1 - vert : vert;
+          if (!fn[y][x] && idx < out.length * 8){
+            mod[y][x] = ((out[idx >>> 3] >>> (7 - (idx & 7))) & 1);
+            idx++;
+          }
+        }
+      }
+    }
+
+    function applyMask(m){
+      for (var y = 0; y < size; y++) for (var x = 0; x < size; x++){
+        var inv;
+        switch (m){
+          case 0: inv = (x + y) % 2 === 0; break;
+          case 1: inv = y % 2 === 0; break;
+          case 2: inv = x % 3 === 0; break;
+          case 3: inv = (x + y) % 3 === 0; break;
+          case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
+          case 5: inv = (x * y) % 2 + (x * y) % 3 === 0; break;
+          case 6: inv = ((x * y) % 2 + (x * y) % 3) % 2 === 0; break;
+          default: inv = ((x + y) % 2 + (x * y) % 3) % 2 === 0; break;
+        }
+        if (!fn[y][x] && inv) mod[y][x] ^= 1;
+      }
+    }
+    function penalty(){
+      var score = 0, i, j, run, dark, total = size * size, blacks = 0;
+      for (i = 0; i < size; i++){
+        run = 1; for (j = 1; j < size; j++){
+          if (mod[i][j] === mod[i][j-1]) run++; else { if (run >= 5) score += run - 2; run = 1; }
+        }
+        if (run >= 5) score += run - 2;
+        run = 1; for (j = 1; j < size; j++){
+          if (mod[j][i] === mod[j-1][i]) run++; else { if (run >= 5) score += run - 2; run = 1; }
+        }
+        if (run >= 5) score += run - 2;
+      }
+      for (i = 0; i < size - 1; i++) for (j = 0; j < size - 1; j++){
+        var v = mod[i][j];
+        if (v === mod[i][j+1] && v === mod[i+1][j] && v === mod[i+1][j+1]) score += 3;
+      }
+      for (i = 0; i < size; i++) for (j = 0; j < size; j++) if (mod[i][j]) blacks++;
+      var ratio = blacks / total;
+      var pct = Math.abs(ratio - 0.5) / 0.05;
+      score += Math.floor(pct) * 10;
+      return score;
+    }
+    function formatBits(ecBits, mask){
+      var data = (ecBits << 3) | mask, rem2 = data << 10;
+      for (var i = 14; i >= 10; i--) if ((rem2 >>> i) & 1) rem2 ^= 0x537 << (i - 10);
+      return (((data << 10) | (rem2 & 0x3ff)) ^ 0x5412) & 0x7fff;
+    }
+
+    var best = 0, minP = Infinity;
+    for (var m2 = 0; m2 < 8; m2++){
+      applyMask(m2); drawFormatBits(formatBits(0b00, m2));
+      var p = penalty();
+      if (p < minP){ minP = p; best = m2; }
+      applyMask(m2);
+    }
+    applyMask(best); drawFormatBits(formatBits(0b00, best));
+
+    return { size: size, version: version, modules: mod, get: function(r, c){ return mod[r][c]; } };
+  }
+
+  return { encode: encode };
+})();
+
+/* ---------- 主密码：PBKDF2 派生 + AES-GCM 加密本地数据 ---------- */
+var PBKDF2_ITER = 310000;   // OWASP 对 PBKDF2-HMAC-SHA256 建议 >=600000，此处取性能与安全的折中
+function b64encode(bytes){
+  var s = '';
+  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64decode(str){
+  var bin = atob(str), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+// 派生出的 AES 密钥为 non-extractable：可加解密，但任何脚本都无法导出密钥原文
+async function deriveKey(password, saltBytes, iter){
+  var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(password)), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:saltBytes, iterations:iter || PBKDF2_ITER, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function encryptString(key, text){
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv:iv }, key, new TextEncoder().encode(text)));
+  return { iv: b64encode(iv), data: b64encode(ct) };
+}
+async function decryptString(key, ivB64, dataB64){
+  var pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:b64decode(ivB64) }, key, b64decode(dataB64));
+  return new TextDecoder().decode(pt);
+}
+
+if (typeof module !== 'undefined' && module.exports){
+  module.exports = { normalizeSecret:normalizeSecret, base32Decode:base32Decode, generateTOTP:generateTOTP,
+    parseOtpauthUri:parseOtpauthUri, buildOtpauthUri:buildOtpauthUri, QR:QR,
+    deriveKey:deriveKey, encryptString:encryptString, decryptString:decryptString,
+    b64encode:b64encode, b64decode:b64decode, PBKDF2_ITER:PBKDF2_ITER };
+}
+</script>
+
+<!-- 二维码识别：内联 jsQR（Apache-2.0，https://github.com/cozmo/jsQR）
+     来源：npm jsqr@1.4.0，terser 压缩；tools/jsqr.min.js 的 sha256:
+     403697452de70fe24a19d34ca900b2c2513e2caffe1801c94e4fb083b1e342ee（130197 bytes）
+     已静态核查：不含 fetch / XHR / WebSocket / sendBeacon / eval / localStorage / document.cookie 调用。
+     由 tools/inline-jsqr.mjs 注入，勿手工编辑本段内容；升级请重新压缩并更新上面的哈希。 -->
+<script id="jsqr-lib">
+/*__JSQR_INLINE__*/
+</script>
+
+<script id="app">
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- 网络请求自检：统计本页脚本运行后发起的对外请求 ---------- */
+  var netCount = 0;
+  (function watchNet(){
+    function bump(){ netCount++; var el = $('net-count'); if (el) el.textContent = String(netCount); }
+    if (window.fetch){ var f = window.fetch; window.fetch = function(){ bump(); return f.apply(this, arguments); }; }
+    if (window.XMLHttpRequest){
+      var open = window.XMLHttpRequest.prototype.open;
+      window.XMLHttpRequest.prototype.open = function(){ bump(); return open.apply(this, arguments); };
+    }
+    if (navigator.sendBeacon){ var sb = navigator.sendBeacon; navigator.sendBeacon = function(){ bump(); return sb.apply(this, arguments); }; }
+    if (window.WebSocket){
+      var WS = window.WebSocket;
+      window.WebSocket = function(){ bump(); return new WS(arguments[0], arguments[1]); };
+      window.WebSocket.prototype = WS.prototype;
+    }
+  })();
+
+  var STORE_KEY = 'totp-web-accounts-v1';
+  // mode: 'enc' 主密码加密（新用户强制引导设置）| 'plain' 未加密（仅老数据过渡态，有提示条催促）
+  // locked: 处于加密但未解锁
+  var state = { accounts: [], mode: 'plain', locked: false, cryptoKey: null, encMeta: null, hasStoredData: false };
+  var IDLE_LOCK_MS = 5 * 60 * 1000;   // 闲置自动锁定
+  var lastActivity = Date.now();
+  var cards = new Map();     // id -> {el, code, bar, sec, counter}
+
+  /* ---------- 环境检测 ---------- */
+  var envMsg = [];
+  if (!(window.crypto && crypto.subtle)){
+    envMsg.push('当前环境不支持 WebCrypto（需 https 或 localhost），口令生成不可用。');
+  }
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    envMsg.push('当前环境无法调用摄像头（浏览器要求 https 或 localhost）；可用「图片」识别二维码，或手动输入 Secret。');
+  }
+  if (envMsg.length){
+    var w = $('env-warn'); w.classList.remove('hidden'); w.textContent = envMsg.join(' ');
+  }
+
+  /* ---------- 存储 ---------- */
+  function load(){
+    state.mode = 'plain'; state.locked = false; state.cryptoKey = null; state.encMeta = null;
+    state.hasStoredData = false;
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return [];
+      state.hasStoredData = true;      // 有过数据 = 已不是新用户，不再强制引导
+      var data = JSON.parse(raw);
+      if (data && data.enc && data.enc.data){
+        // 加密存储：未解锁前拿不到任何账户
+        state.mode = 'enc'; state.locked = true;
+        state.encMeta = { salt: data.enc.salt, iter: data.enc.iter || PBKDF2_ITER, iv: data.enc.iv, data: data.enc.data };
+        return [];
+      }
+      var list = Array.isArray(data) ? data : data.accounts;
+      return (list || []).filter(function(a){ return a && a.secret; }).map(normalizeAccount);
+    } catch (e){ return []; }
+  }
+  async function save(){
+    try {
+      if (state.mode === 'enc'){
+        if (!state.cryptoKey){ toast('未解锁，无法保存'); return; }
+        var enc = await encryptString(state.cryptoKey, JSON.stringify({ v: 2, accounts: state.accounts }));
+        // 回写 iv/密文：每次加密 IV 都会变，内存里的元数据必须同步，否则本会话内锁定后再解锁会拿到过期密文
+        state.encMeta.iv = enc.iv; state.encMeta.data = enc.data;
+        localStorage.setItem(STORE_KEY, JSON.stringify({
+          v: 2, mode: 'enc',
+          enc: { salt: state.encMeta.salt, iter: state.encMeta.iter, iv: enc.iv, data: enc.data }
+        }));
+      } else {
+        localStorage.setItem(STORE_KEY, JSON.stringify({ v: 2, mode: 'plain', accounts: state.accounts }));
+      }
+    } catch (e){ toast('保存失败：' + (e && e.message ? e.message : '本地存储不可用')); }
+  }
+  function normalizeAccount(a){
+    return {
+      id: a.id || ('a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+      secret: normalizeSecret(a.secret),
+      issuer: a.issuer || '', account: a.account || a.label || '',
+      digits: (Number(a.digits) === 8 ? 8 : 6),
+      period: (Number(a.period) >= 5 && Number(a.period) <= 300) ? Number(a.period) : 30,
+      algorithm: (ALGO_MAP[String(a.algorithm || 'SHA1').toUpperCase()] ? String(a.algorithm).toUpperCase() : 'SHA1'),
+      createdAt: a.createdAt || Date.now()
+    };
+  }
+
+  /* ---------- UI 基础 ---------- */
+  var toastTimer;
+  function toast(msg){
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+  function openModal(html){ $('modal-box').innerHTML = html; $('modal').classList.remove('hidden'); }
+  function closeModal(){ $('modal').classList.add('hidden'); $('modal-box').innerHTML = ''; stopScan(); }
+  $('modal').addEventListener('click', function(e){ if (e.target === $('modal')) closeModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeModal(); });
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  /* ---------- 渲染 ---------- */
+  var addOpen = true;   // 添加面板展开意图（窄屏启动时置 false）
+  function applyPanelVisibility(){
+    var locked = state.mode === 'enc' && state.locked;
+    // 新用户（本机从未保存过数据）必须先设主密码才能使用
+    var onboarding = state.mode === 'plain' && !locked && !state.hasStoredData;
+    $('lock-panel').classList.toggle('hidden', !locked);
+    $('onboard-panel').classList.toggle('hidden', !onboarding);
+    $('upgrade-tip').classList.toggle('hidden', !(state.mode === 'plain' && !locked && state.hasStoredData));
+    $('list').classList.toggle('hidden', locked || onboarding);
+    $('add-panel').classList.toggle('hidden', locked || onboarding || !addOpen);
+    $('btn-toggle-add').classList.toggle('hidden', locked || onboarding);
+    // 引导态已有主 CTA，不再重复展示 header 的「设置主密码」按钮
+    // 加密一旦启用就不可关闭（否则等于给了一个把 Secret 变回明文的开关）。
+    // 因此：引导态 / 已加密未锁定时都隐藏该按钮，只在「未加密」和「已锁定」时露出。
+    $('btn-crypto').classList.toggle('hidden', onboarding || (state.mode === 'enc' && !locked));
+    $('btn-crypto').textContent = locked ? '已加密 · 解锁' : '设置主密码';
+    $('btn-lock').classList.toggle('hidden', !(state.mode === 'enc' && !locked));
+    $('btn-lock').title = '立即锁定（闲置 ' + (IDLE_LOCK_MS / 60000) + ' 分钟也会自动锁定）';
+    $('btn-clear').classList.toggle('hidden', locked || onboarding || state.accounts.length === 0);
+    // 强制引导 + 加密不可关闭后，未设主密码就无法存任何 Secret：
+    // 明文态只可能是「本应用早期版本遗留的历史数据」这一种情况
+    var plainCount = state.mode === 'plain' ? state.accounts.length : 0;
+    $('sec-note').textContent = state.mode === 'enc'
+      ? '安全提示：Secret 已用主密码（PBKDF2 + AES-GCM）加密后保存在本机浏览器的 localStorage，密码本身不保存、遗忘无法找回。解锁后明文只存在于内存，手动点「锁定」或闲置 5 分钟即释放；忘记密码请用锁屏页的「清除本机浏览器加密数据」清空后重新设置。'
+      : (plainCount
+        ? '安全提示：当前有 ' + plainCount + ' 个账户的 Secret 未加密存在本机浏览器的 localStorage（本应用早期版本遗留的历史明文数据），任何能打开这台浏览器的人都能直接看到 —— 它不会上传，但也没有加密保护。点上方提示条中的「立即设置」即可一次性加密（加密后不可关闭）。'
+        : '本机浏览器暂无账户。添加账户前必须先设置主密码，Secret 只会以密文落到本机浏览器。');
+
+    if (state.mode === 'plain' && !locked && state.hasStoredData){
+      $('upgrade-text').textContent = plainCount
+        ? '：仍有 ' + plainCount + ' 个账户的 Secret 以明文保存在本机浏览器，任何能打开这台浏览器的人都能直接看到。'
+        : '：尚未启用加密存储，添加账户前会先要求设置主密码。';
+    }
+  }
+  function render(){
+    var locked = state.mode === 'enc' && state.locked;
+    var list = $('list');
+    list.innerHTML = '';
+    cards.clear();
+    (locked ? [] : state.accounts).forEach(function(acc){
+      var el = document.createElement('div');
+      el.className = 'card acc';
+      var title = acc.account || '未命名账户';
+      el.innerHTML =
+        '<div class="head">' +
+          '<div><div class="name">' + escapeHtml(title) + '</div>' +
+            (acc.issuer ? '<div class="issuer">' + escapeHtml(acc.issuer) + '</div>' : '') + '</div>' +
+          '<button class="x" data-act="del" title="删除">×</button>' +
+        '</div>' +
+        '<div class="code mono" data-act="copy" title="点击复制口令">------</div>' +
+        '<div class="bar-wrap"><div class="bar"></div></div>' +
+        '<div class="meta"><span class="sec">--</span>' +
+          '<span class="ops"><button class="btn sm" data-act="copy-btn">复制</button>' +
+          '<button class="btn sm" data-act="qr">二维码</button></span></div>';
+
+      el.querySelector('[data-act=del]').addEventListener('click', async function(){
+        if (!confirm('删除账户「' + title + '」？此操作不可撤销。')) return;
+        state.accounts = state.accounts.filter(function(x){ return x.id !== acc.id; });
+        if (addMsgAccId === acc.id) resetAddMsg(); // 提示里挂的就是它，别留下“已添加”的陈旧提示
+        await save(); render();
+        toast('已删除「' + title + '」');
+      });
+      var codeEl = el.querySelector('.code');
+      // 桌面：点数字本身复制（有 hover 提示 + 手型光标）
+      // 触屏：没有 hover，tooltip 完全不可见，因此 ops 区另给一个明确的「复制」按钮
+      codeEl.addEventListener('click', function(){
+        copyText(codeEl.textContent.replace(/\s/g, ''), null, codeEl);
+      });
+      el.querySelector('[data-act=copy-btn]').addEventListener('click', function(){
+        copyText(codeEl.textContent.replace(/\s/g, ''), null, codeEl);
+      });
+      el.querySelector('[data-act=qr]').addEventListener('click', function(){ showQr(acc); });
+
+      list.appendChild(el);
+      cards.set(acc.id, {
+        el: el,
+        code: el.querySelector('.code'),
+        bar: el.querySelector('.bar'),
+        sec: el.querySelector('.sec'),
+        counter: -1
+      });
+    });
+    $('empty').classList.toggle('hidden', locked || (state.mode === 'plain' && !state.hasStoredData) || state.accounts.length > 0);
+    $('copy-tip').classList.toggle('hidden', locked || state.accounts.length === 0);
+    // 账户被清空（删除/忘记密码清空/锁定）时，添加面板的「已添加 xxx」提示也该回到默认
+    if (state.accounts.length === 0) resetAddMsg();
+    applyPanelVisibility();
+    if (!locked) tick(true);
+  }
+
+  // 任何交互都算活动；闲置达阈值则自动锁定（仅在加密且已解锁时生效）
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll', 'click'].forEach(function(ev){
+    document.addEventListener(ev, function(){ lastActivity = Date.now(); }, { passive: true });
+  });
+
+  var ticking = false;
+  async function tick(force){
+    if (state.mode === 'enc' && !state.locked && Date.now() - lastActivity >= IDLE_LOCK_MS){
+      lockNow(true);
+      return;
+    }
+    if (ticking) return;
+    ticking = true;
+    try {
+      var now = Date.now();
+      for (var i = 0; i < state.accounts.length; i++){
+        var acc = state.accounts[i], ref = cards.get(acc.id);
+        if (!ref) continue;
+        var periodMs = acc.period * 1000;
+        var remain = periodMs - (now % periodMs);
+        var counter = Math.floor(now / 1000 / acc.period);
+        var ratio = remain / periodMs;
+        ref.bar.style.width = (ratio * 100).toFixed(2) + '%';
+        ref.sec.textContent = Math.ceil(remain / 1000) + 's · ' + acc.digits + '位 · ' + String(acc.algorithm).replace('SHA', 'SHA-');
+        var warn = remain <= 5000;
+        ref.bar.classList.toggle('warn', warn);
+        ref.code.classList.toggle('warn', warn);
+        if (ref.counter !== counter || force){
+          var c = counter;
+          ref.counter = c;
+          try {
+            var code = await generateTOTP(acc.secret, acc, now);
+            if (cards.get(acc.id) === ref && ref.counter === c) ref.code.textContent = code;
+          } catch (e){
+            ref.code.textContent = '错误';
+            ref.code.title = e.message;
+          }
+        }
+      }
+    } finally { ticking = false; }
+  }
+  setInterval(tick, 250);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) tick(true); });
+
+  /* ---------- 剪贴板 ---------- */
+  function copyText(text, note, flashEl){
+    if (!text || text === '------'){ toast('还没有生成口令'); return; }
+    var done = function(){
+      toast(note || ('已复制 ' + text));
+      // 就地反馈：底部 toast 容易被忽略，复制后直接在被点的元素上盖一个“已复制”气泡
+      if (flashEl){
+        if (flashEl._copyTimer) clearTimeout(flashEl._copyTimer);
+        flashEl.classList.remove('copied');
+        void flashEl.offsetWidth; // 强制重排，连点两次也能重新播放动画
+        flashEl.classList.add('copied');
+        flashEl._copyTimer = setTimeout(function(){
+          flashEl.classList.remove('copied');
+          flashEl._copyTimer = 0;
+        }, 1200);
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else fallback();
+
+    // 兜底：navigator.clipboard 只在安全上下文（https / localhost）存在。
+    // 手机通过局域网 http 访问时它根本不存在，只能走 execCommand，而 iOS Safari 还要求
+    // contentEditable + 显式 setSelectionRange 才肯复制。
+    function fallback(){
+      var ok = false;
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.contentEditable = 'true';       // iOS Safari：否则 select() 不生效
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;font-size:16px';
+      document.body.appendChild(ta);
+      try {
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, text.length);  // iOS Safari 需要显式选区
+        ok = document.execCommand('copy');      // 返回 false 表示没复制成功，不能假装成功
+      } catch (e){ ok = false; }
+      document.body.removeChild(ta);
+      ok ? done() : fail();
+    }
+    // 复制真的失败时：说清楚原因，并顺手选中口令，用户可以长按/⌘C 手动复制
+    function fail(){
+      toast(window.isSecureContext === false
+        ? 'http 访问无法调用系统剪贴板，已选中口令，请长按复制（或改用 https/localhost 打开）'
+        : '复制失败，已选中口令，请长按或 Ctrl+C 复制');
+      if (flashEl && window.getSelection){
+        try {
+          var r = document.createRange();
+          r.selectNodeContents(flashEl);
+          var s = window.getSelection();
+          s.removeAllRanges(); s.addRange(r);
+        } catch (e){}
+      }
+    }
+  }
+
+  /* ---------- 添加账户 ---------- */
+  function parseInput(rawSecret, labelRaw, opts){
+    var s = String(rawSecret || '').trim();
+    if (!s) throw new Error('请填写 Secret 或 otpauth 链接');
+    var acc;
+    if (/^otpauth:\/\//i.test(s)){
+      acc = parseOtpauthUri(s);
+    } else {
+      acc = { secret: normalizeSecret(s), issuer: '', account: '', digits: opts.digits, period: opts.period, algorithm: opts.algorithm };
+      base32Decode(acc.secret); // 校验合法性
+    }
+    if (opts.digits !== 6 || opts.period !== 30 || opts.algorithm !== 'SHA1'){
+      // 表单里显式改过高级参数时以表单为准
+      var def = { digits: 6, period: 30, algorithm: 'SHA1' };
+      if (opts.digits !== def.digits) acc.digits = opts.digits;
+      if (opts.period !== def.period) acc.period = opts.period;
+      if (opts.algorithm !== def.algorithm) acc.algorithm = opts.algorithm;
+    }
+    var label = String(labelRaw || '').trim();
+    if (label){
+      var c = label.indexOf(':');
+      if (c > 0){ if (!acc.issuer) acc.issuer = label.slice(0, c).trim(); acc.account = label.slice(c + 1).trim(); }
+      else acc.account = label;
+    }
+    return normalizeAccount(acc);
+  }
+
+  // 添加面板提示条：默认文案与各状态文案集中在这里，避免删了账户后还挂着「已添加 xxx」的陈旧提示
+  var addMsgAccId = null;
+  function resetAddMsg(){
+    var m = $('add-msg');
+    if (!m) return;
+    m.className = 'hint';
+    m.textContent = '可直接粘贴 Google / Microsoft Authenticator 导出的 otpauth:// 链接，或手动输入 Base32 Secret。';
+  }
+
+  $('btn-add').addEventListener('click', async function(){
+    var msg = $('add-msg');
+    msg.className = 'hint'; msg.textContent = '校验中…';
+    addMsgAccId = null; // 一旦进入校验/报错，就不再让旧账户“认领”这条提示
+    var opts = {
+      digits: Number($('in-digits').value) || 6,
+      period: Number($('in-period').value) || 30,
+      algorithm: $('in-algo').value
+    };
+    var acc;
+    try { acc = parseInput($('in-secret').value, $('in-label').value, opts); }
+    catch (e){ msg.className = 'hint err'; msg.textContent = e.message; return; }
+    try { await generateTOTP(acc.secret, acc, Date.now()); }
+    catch (e){ msg.className = 'hint err'; msg.textContent = 'Secret 无效：' + e.message; return; }
+
+    if (state.accounts.some(function(x){ return x.secret === acc.secret && x.account === acc.account; })){
+      msg.className = 'hint err'; msg.textContent = '该账户已存在'; return;
+    }
+    state.accounts.unshift(acc);
+    await save(); render();
+    $('in-secret').value = ''; $('in-label').value = ''; lastAuto = '';
+    msg.className = 'hint'; msg.textContent = '已添加「' + (acc.account || acc.issuer || '未命名') + '」';
+    addMsgAccId = acc.id; // 记住这条提示说的是谁，删掉它时好一并撤掉
+    toast('账户已添加');
+  });
+
+  $('btn-toggle-add').addEventListener('click', function(){
+    addOpen = !addOpen;
+    applyPanelVisibility();
+    if (addOpen) $('in-secret').focus();
+  });
+  $('btn-sec-detail').addEventListener('click', function(){
+    var d = $('sec-detail'); var hide = d.classList.toggle('hidden');
+    this.textContent = hide ? '自检详情 ▾' : '自检详情 ▴';
+  });
+  $('btn-adv').addEventListener('click', function(){
+    var a = $('adv'); var hide = a.classList.toggle('hidden');
+    this.textContent = hide ? '高级参数 ▾' : '高级参数 ▴';
+  });
+  $('btn-clear').addEventListener('click', async function(){
+    if (!state.accounts.length) return;
+    if (!confirm('清空全部 ' + state.accounts.length + ' 个账户？Secret 将从本机浏览器删除。')) return;
+    state.accounts = []; await save(); render(); toast('已清空');
+  });
+
+  /* ---------- 主密码：加密 / 解锁 / 锁定 / 清除 ---------- */
+  function showSetPassword(){
+    openModal(
+      '<h3>设置主密码</h3>' +
+      '<div class="tip">启用后，本机浏览器保存的 Secret 会用该密码派生的密钥（PBKDF2 + AES-GCM）加密。' +
+      '<b>密码不会被保存</b>，每次打开页面都要重新输入；加密<b>一旦启用不可关闭</b>，如需更换只能清除本机浏览器数据后重设。</div>' +
+      '<label class="f" style="margin-top:10px"><span>主密码（至少 6 位）</span>' +
+        '<input id="pw1" type="password" autocomplete="new-password" /></label>' +
+      '<label class="f" style="margin-top:8px"><span>确认主密码</span>' +
+        '<input id="pw2" type="password" autocomplete="new-password" /></label>' +
+      '<label class="pw-ack"><input id="pw-ack" type="checkbox" />' +
+        '<span>我已牢记该密码，并理解：<b>密码不会被保存</b>，遗忘后<b>无法找回</b>，' +
+        '只能清除本机浏览器数据并重新设置。闲置 5 分钟会自动锁定。</span></label>' +
+      '<div class="foot"><button class="btn" id="pw-cancel">取消</button>' +
+        '<button class="btn primary" id="pw-ok">启用加密</button></div>'
+    );
+    $('pw-cancel').onclick = closeModal;
+    $('pw1').focus();
+    $('pw-ok').onclick = async function(){
+      var p1 = $('pw1').value, p2 = $('pw2').value;
+      if (p1.length < 6){ toast('密码至少 6 位'); return; }
+      if (p1 !== p2){ toast('两次输入的密码不一致'); return; }
+      if (!$('pw-ack').checked){ toast('请先确认已牢记密码'); return; }
+      this.disabled = true; this.textContent = '正在派生密钥…';
+      try {
+        var salt = crypto.getRandomValues(new Uint8Array(16));
+        var key = await deriveKey(p1, salt, PBKDF2_ITER);
+        state.mode = 'enc'; state.cryptoKey = key; state.locked = false;
+        state.encMeta = { salt: b64encode(salt), iter: PBKDF2_ITER, iv: '', data: '' };
+        await save();
+        state.hasStoredData = true; lastActivity = Date.now();
+        closeModal(); render();
+        toast('已启用加密，请牢记密码（密码不存储，遗忘只能清空重设）');
+      } catch (e){
+        this.disabled = false; this.textContent = '启用加密';
+        toast('启用失败：' + (e && e.message ? e.message : e));
+      }
+    };
+  }
+
+  async function unlock(password){
+    var btn = $('btn-unlock'), msg = $('lock-msg');
+    msg.className = 'hint'; msg.textContent = '正在派生密钥并解密…';
+    btn.disabled = true; btn.textContent = '解锁中…';
+    try {
+      // 始终以存储中的最新密文为准（可能由另一个标签页写入）
+      var cur = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      var meta = (cur && cur.enc) || state.encMeta;
+      if (!meta || !meta.data) throw new Error('本机浏览器没有加密数据');
+      var key = await deriveKey(password, b64decode(meta.salt), meta.iter || PBKDF2_ITER);
+      var json = await decryptString(key, meta.iv, meta.data);
+      var data = JSON.parse(json);
+      state.accounts = ((data && data.accounts) || []).filter(function(a){ return a && a.secret; }).map(normalizeAccount);
+      state.cryptoKey = key; state.locked = false;
+      state.encMeta = { salt: meta.salt, iter: meta.iter || PBKDF2_ITER, iv: meta.iv, data: meta.data };
+      lastActivity = Date.now();
+      $('in-master').value = '';
+      msg.textContent = '';
+      render(); toast('已解锁');
+    } catch (e){
+      // AES-GCM 认证失败 = 密码错误（或数据被篡改）
+      msg.className = 'hint err';
+      msg.textContent = '密码错误，或本机浏览器加密数据已损坏。若忘记密码，可清除后重新录入。';
+    } finally {
+      btn.disabled = false; btn.textContent = '解锁';
+    }
+  }
+
+  function lockNow(auto){
+    state.cryptoKey = null; state.locked = true; state.accounts = [];
+    lastActivity = Date.now();
+    render();
+    toast(auto ? '已闲置超过 ' + (IDLE_LOCK_MS / 60000) + ' 分钟，自动锁定' : '已锁定，需重新输入主密码');
+  }
+
+  function wipeEncrypted(){
+    if (!confirm('将永久删除本机浏览器保存的全部账户与加密数据，且无法恢复。确定继续？')) return;
+    try { localStorage.removeItem(STORE_KEY); } catch (e){}
+    state.accounts = []; state.mode = 'plain'; state.locked = false; state.cryptoKey = null; state.encMeta = null;
+    state.hasStoredData = false;   // 回到新用户态，重新引导设置主密码
+    render(); toast('已清除本机浏览器数据，请重新设置主密码');
+  }
+
+  $('btn-crypto').addEventListener('click', function(){
+    if (state.mode === 'enc' && state.locked){ $('in-master').focus(); return; }
+    showSetPassword();
+  });
+  $('btn-lock').addEventListener('click', function(){ lockNow(false); });
+  $('btn-onboard-set').addEventListener('click', showSetPassword);
+  $('btn-upgrade-set').addEventListener('click', showSetPassword);
+  $('btn-unlock').addEventListener('click', function(){ unlock($('in-master').value); });
+  $('in-master').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') unlock(this.value);
+  });
+  $('btn-wipe').addEventListener('click', wipeEncrypted);
+
+  /* ---------- 二维码：展示 ---------- */
+  function showQr(acc){
+    var uri = buildOtpauthUri(acc);
+    var m;
+    try { m = QR.encode(uri); }
+    catch (e){ toast(e.message); return; }
+    var quiet = 4, total = m.size + quiet * 2;
+    var scale = Math.max(3, Math.floor(300 / total));
+    var px = total * scale;
+    openModal(
+      '<h3>' + escapeHtml(acc.account || acc.issuer || '账户') + ' · 迁移二维码</h3>' +
+      '<canvas id="qr-canvas" width="' + px + '" height="' + px + '"></canvas>' +
+      '<div class="tip">用另一台设备的验证器 App 扫描即可导入。<br><span class="mono" style="font-size:11px;word-break:break-all">' + escapeHtml(uri).replace(/(secret=)([^&]+)/, '$1' + escapeHtml(acc.secret.slice(0, 4)) + '••••') + '</span></div>' +
+      '<div class="foot"><button class="btn" id="qr-copy">复制链接</button><button class="btn primary" id="qr-close">关闭</button></div>'
+    );
+    var cv = $('qr-canvas'), ctx = cv.getContext && cv.getContext('2d');
+    if (!ctx){ toast('当前环境不支持 Canvas，无法渲染二维码'); closeModal(); return; }
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
+    ctx.fillStyle = '#111827';
+    for (var r = 0; r < m.size; r++) for (var c = 0; c < m.size; c++){
+      if (m.get(r, c)) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+    }
+    $('qr-close').onclick = closeModal;
+    $('qr-copy').onclick = function(){
+      copyText(uri, '链接已复制（内含 Secret，请勿粘贴到聊天、网页或工单）');
+    };
+  }
+
+  /* ---------- 二维码：识别 ---------- */
+  var scanStream = null, scanTimer = null, detector = null, detectorBroken = false;
+  function getDetector(){
+    if (detectorBroken || !('BarcodeDetector' in window)) return null;
+    if (!detector){
+      try { detector = new BarcodeDetector({ formats: ['qr_code'] }); }
+      catch (e){ try { detector = new BarcodeDetector(); } catch (e2){ detector = null; detectorBroken = true; } }
+    }
+    return detector;
+  }
+
+  // 取帧：video 或 image 统一画到 canvas 再取像素，供 jsQR 解码
+  var scanCanvas = null;
+  function grabPixels(source){
+    var w = source.videoWidth || source.width || 0;
+    var h = source.videoHeight || source.height || 0;
+    if (!w || !h) return null;
+    var maxSide = 520;                       // 限制采样尺寸，兼顾识别率与性能
+    var scale = Math.min(1, maxSide / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * scale));
+    var ch = Math.max(1, Math.round(h * scale));
+    if (!scanCanvas) scanCanvas = document.createElement('canvas');
+    scanCanvas.width = cw; scanCanvas.height = ch;
+    var ctx = scanCanvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(source, 0, 0, cw, ch);
+    var img = ctx.getImageData(0, 0, cw, ch);
+    return { data: img.data, width: cw, height: ch };
+  }
+  function decodeWithJsQR(source){
+    if (typeof window.jsQR !== 'function') return null;
+    var px = grabPixels(source);
+    if (!px) return null;
+    try {
+      var res = window.jsQR(px.data, px.width, px.height, { inversionAttempts: 'dontInvert' });
+      return res && res.data ? res.data : null;
+    } catch (e){ return null; }
+  }
+  // 优先用系统原生解码（省电、快），不可用时回退内置 jsQR —— 覆盖 Firefox/Safari/桌面 Chrome
+  async function detectQr(source){
+    var d = getDetector();
+    if (d){
+      try {
+        var res = await d.detect(source);
+        if (res && res.length) return res[0].rawValue;
+      } catch (e){}
+    }
+    return decodeWithJsQR(source);
+  }
+  // 图片源：优先 createImageBitmap，旧浏览器回退 <img>
+  function loadImageSource(file){
+    if (window.createImageBitmap){
+      return createImageBitmap(file).catch(function(){ return loadViaImg(file); });
+    }
+    return loadViaImg(file);
+  }
+  function loadViaImg(file){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      img.onload = function(){ resolve(img); };
+      img.onerror = function(){ reject(new Error('图片无法读取')); };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  // 把解析结果回填到表单，便于用户确认后再添加
+  function applyParsed(p){
+    $('in-label').value = (p.issuer ? p.issuer + ':' : '') + p.account;
+    $('in-digits').value = String(p.digits);
+    $('in-period').value = String(p.period);
+    $('in-algo').value = p.algorithm;
+    var msg = $('add-msg');
+    msg.className = 'hint';
+    msg.textContent = '已识别：' + (p.issuer ? p.issuer + ' / ' : '') + p.account +
+      '（' + p.digits + '位 / ' + p.period + 's / ' + p.algorithm + '），确认后点「添加」。';
+  }
+
+  function onDetected(text){
+    if (!text) return;
+    stopScan(); closeModal();
+    $('in-secret').value = text;
+    var msg = $('add-msg');
+    msg.className = 'hint';
+    if (/^otpauth:\/\//i.test(text)){
+      try { applyParsed(parseOtpauthUri(text)); }
+      catch (e){ msg.className = 'hint err'; msg.textContent = '识别到链接但解析失败：' + e.message; }
+    } else {
+      msg.textContent = '识别到内容已填入 Secret 输入框（非 otpauth 链接，请确认是否为 Secret）。';
+    }
+    $('add-panel').classList.remove('hidden');
+    toast('识别成功');
+  }
+
+  // 粘贴 otpauth 链接时即时解析并回填（与扫码行为一致）
+  var lastAuto = '';
+  $('in-secret').addEventListener('input', function(){
+    var s = this.value.trim();
+    if (!/^otpauth:\/\//i.test(s) || s === lastAuto) return;
+    lastAuto = s;
+    try { applyParsed(parseOtpauthUri(s)); }
+    catch (e){
+      var msg = $('add-msg');
+      msg.className = 'hint err';
+      msg.textContent = '链接解析失败：' + e.message;
+    }
+  });
+  function stopScan(){
+    if (scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+    if (scanStream){ scanStream.getTracks().forEach(function(t){ t.stop(); }); scanStream = null; }
+  }
+
+  $('btn-scan').addEventListener('click', async function(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      toast('无法访问摄像头（需 https 或 localhost）；可改用「图片」识别或手动输入'); return;
+    }
+    openModal(
+      '<h3>扫描二维码</h3>' +
+      '<video id="scan-video" autoplay muted playsinline></video>' +
+      '<div class="tip">将二维码对准摄像头。若无法启动摄像头，请关闭后用「图片」选择二维码截图。</div>' +
+      '<div class="foot"><button class="btn" id="scan-cancel">取消</button></div>'
+    );
+    var video = $('scan-video');
+    $('scan-cancel').onclick = function(){ stopScan(); closeModal(); };
+    try {
+      scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = scanStream;
+      await video.play();
+    } catch (e){
+      stopScan(); closeModal();
+      toast('摄像头启动失败：' + (e && e.name === 'NotAllowedError' ? '权限被拒绝' : (e && e.message) || '未知错误'));
+      return;
+    }
+    (function loop(){
+      scanTimer = setTimeout(async function(){
+        if (!scanStream) return;
+        try {
+          var text = await detectQr(video);
+          if (text){ onDetected(text); return; }
+        } catch (e){}
+        loop();
+      }, 220);
+    })();
+  });
+
+  $('btn-pick').addEventListener('click', function(){
+    $('file-input').click();
+  });
+  $('file-input').addEventListener('change', async function(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    toast('识别中…');
+    try {
+      var src = await loadImageSource(file);
+      var text = await detectQr(src);
+      if (src && src.close) src.close();
+      if (text) onDetected(text);
+      else toast('未识别到二维码，请换一张清晰、完整的截图');
+    } catch (err){
+      toast('图片识别失败：' + ((err && err.message) || '未知错误'));
+    }
+  });
+
+  /* ---------- 启动 ---------- */
+  state.accounts = load();
+  // 窄屏优先展示账户列表：默认收起添加面板，点「添加账户」再展开
+  if (window.matchMedia && window.matchMedia('(max-width:720px)').matches){
+    addOpen = false;
+  }
+  render();
+
+  /*__SELFTEST_START__*/
+  // 自测入口：控制台执行 selfTestOTP()（构建产物会剥离，仅源码保留用于审计/调试）
+  window.selfTestOTP = async function(){
+    var vectors = [
+      [59, '94287082'], [1111111109, '07081804'], [1111111111, '14050471'],
+      [1234567890, '89005924'], [2000000000, '69279037'], [20000000000, '65353130']
+    ];
+    var secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'; // "12345678901234567890"
+    var out = [];
+    for (var i = 0; i < vectors.length; i++){
+      var got = await generateTOTP(secret, { digits: 8, period: 30, algorithm: 'SHA1' }, vectors[i][0] * 1000);
+      out.push({ t: vectors[i][0], expect: vectors[i][1], got: got, ok: got === vectors[i][1] });
+    }
+    console.table(out);
+    return out.every(function(x){ return x.ok; });
+  };
+  /*__SELFTEST_END__*/
+})();
+</script>
+</body>
+</html>

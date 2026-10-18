@@ -1,0 +1,13 @@
+# 依赖与构建产物 / dependencies & build output
+node_modules/
+dist/
+
+# WorkBuddy 项目元数据（不应进入开源仓库）
+.vscode/
+.idea/
+.workbuddy/
+
+# 系统文件 / OS files
+.DS_Store
+Thumbs.db
+*.log

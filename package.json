@@ -1,0 +1,27 @@
+{
+  "name": "totp-web",
+  "version": "1.0.0",
+  "description": "纯前端 TOTP 身份验证器：单文件、零网络、可离线、MIT 开源 / A pure front-end TOTP authenticator: single-file, zero-network, offline, MIT licensed",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:jsqr": "node scripts/build.mjs --rebuild-jsqr",
+    "build:min": "node scripts/build.mjs --min",
+    "test": "npm run build && node tools/verify.mjs && node tools/smoke.mjs"
+  },
+  "keywords": [
+    "totp",
+    "authenticator",
+    "2fa",
+    "rfc6238",
+    "single-file",
+    "offline",
+    "pwa"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "jsqr": "^1.4.0",
+    "jsdom": "^24.1.0",
+    "terser": "^5.31.0"
+  }
+}
