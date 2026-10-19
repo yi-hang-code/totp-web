@@ -172,6 +172,13 @@ sha256sum tools/jsqr.min.js # 记录新校验值，便于审计
 
 ---
 
+## 已知环境限制
+
+- **安卓 WebView 系内核的扫码兼容性**：扫码依赖 `getUserMedia` + `BarcodeDetector`/jsQR。部分国产浏览器与微信内置浏览器（XWeb、MiBrowser 等 Chromium 魔改内核，实测 Chromium 135/150 + HyperOS 3）存在内核缺陷：即使网页层与系统层相机权限均已允许（且设置界面显示「已允许」），摄像头请求仍被直接以 `NotAllowedError` 拒绝——授权没有真正下发到内核相机管线（`permissions.query` 仍返回 `prompt`，设备名称保持隐藏）。此类环境下扫码会自动退让为「拍照识别」（经 `<input capture>` 调起系统相机，不走 `getUserMedia`，不受该缺陷影响），也可用「图片」识别二维码截图，或直接粘贴 `otpauth://` 链接，三条路径与实时扫码完全等效。Firefox / Chrome / Safari 正常。
+- 页面需通过 HTTPS（或 localhost）提供：这是浏览器对摄像头与 WebCrypto 的强制要求，与服务端实现无关。
+
+---
+
 ## 许可证
 
 [MIT](./LICENSE) © 2026 the TOTP-Web contributors

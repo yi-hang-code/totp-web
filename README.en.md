@@ -172,6 +172,13 @@ sha256sum tools/jsqr.min.js # record the new checksum for auditing
 
 ---
 
+## Known environment limitations
+
+- **QR scanning on Android WebView-family browsers**: scanning uses `getUserMedia` plus `BarcodeDetector`/jsQR. Some Chromium-based Chinese browsers and in-app browsers (WeChat XWeb, Xiaomi MiBrowser, observed on Chromium 135/150 + HyperOS 3) have a kernel defect: even with both the web-level and system-level camera permissions granted (and the settings UI showing "Allowed"), the camera request is still rejected outright with `NotAllowedError` — the grant never reaches the kernel's camera pipeline (`permissions.query` keeps returning `prompt`, device labels stay hidden). In such environments live scanning automatically falls back to "Take photo" (opens the system camera app via `<input capture>`, no `getUserMedia` involved, unaffected by this defect); "Image" to pick a QR screenshot and pasting the `otpauth://` link directly work as well — all three are fully equivalent to scanning. Firefox / Chrome / Safari work as expected.
+- The page must be served over HTTPS (or localhost): a hard browser requirement for camera and WebCrypto, unrelated to the server implementation.
+
+---
+
 ## License
 
 [MIT](./LICENSE) © 2026 the TOTP-Web contributors

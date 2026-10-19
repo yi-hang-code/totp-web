@@ -391,6 +391,8 @@
 <div id="modal" class="modal hidden"><div class="box" id="modal-box"></div></div>
 <div id="toast"></div>
 <input id="file-input" type="file" accept="image/*" class="hidden" />
+<!-- capture 调起系统相机拍二维码：不走 getUserMedia，不受内核权限管线缺陷影响 -->
+<input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" />
 
 <script id="i18n-lib">
 /* ============================================================
@@ -1375,30 +1377,40 @@ if (typeof module !== 'undefined' && module.exports){
     return detector;
   }
 
-  // 取帧：video 或 image 统一画到 canvas 再取像素，供 jsQR 解码
+  // 取帧：video/image 统一画到 canvas 再取像素，供 jsQR 解码。
+  // opt.maxSide 限制采样长边；opt.crop 从中心裁剪比例（0-1，相机照片里 QR 占比小时提升识别率）
   var scanCanvas = null;
-  function grabPixels(source){
+  function grabPixels(source, opt){
+    opt = opt || {};
     var w = source.videoWidth || source.width || 0;
     var h = source.videoHeight || source.height || 0;
     if (!w || !h) return null;
-    var maxSide = 520;                       // 限制采样尺寸，兼顾识别率与性能
-    var scale = Math.min(1, maxSide / Math.max(w, h));
-    var cw = Math.max(1, Math.round(w * scale));
-    var ch = Math.max(1, Math.round(h * scale));
+    var sx = 0, sy = 0, sw = w, sh = h;
+    if (opt.crop && opt.crop > 0 && opt.crop < 1){
+      sw = Math.max(1, Math.round(w * opt.crop));
+      sh = Math.max(1, Math.round(h * opt.crop));
+      sx = Math.round((w - sw) / 2); sy = Math.round((h - sh) / 2);
+    }
+    var maxSide = opt.maxSide || 520;        // 默认限制采样尺寸，兼顾识别率与性能
+    var scale = Math.min(1, maxSide / Math.max(sw, sh));
+    var cw = Math.max(1, Math.round(sw * scale));
+    var ch = Math.max(1, Math.round(sh * scale));
     if (!scanCanvas) scanCanvas = document.createElement('canvas');
     scanCanvas.width = cw; scanCanvas.height = ch;
     var ctx = scanCanvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(source, 0, 0, cw, ch);
+    if (opt.mirror){ ctx.translate(cw, 0); ctx.scale(-1, 1); }   // 镜像兜底：前置镜头拍出的码
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, cw, ch);
     var img = ctx.getImageData(0, 0, cw, ch);
     return { data: img.data, width: cw, height: ch };
   }
-  function decodeWithJsQR(source){
+  function decodeWithJsQR(source, opt){
     if (typeof window.jsQR !== 'function') return null;
-    var px = grabPixels(source);
+    var px = grabPixels(source, opt);
     if (!px) return null;
     try {
-      var res = window.jsQR(px.data, px.width, px.height, { inversionAttempts: 'dontInvert' });
+      var res = window.jsQR(px.data, px.width, px.height,
+        { inversionAttempts: (opt && opt.invert) ? 'attemptBoth' : 'dontInvert' });
       return res && res.data ? res.data : null;
     } catch (e){ return null; }
   }
@@ -1412,6 +1424,32 @@ if (typeof module !== 'undefined' && module.exports){
       } catch (e){}
     }
     return decodeWithJsQR(source);
+  }
+  // 文件（截图/相机照片）识别：先原生检测，再按多档采样与中心裁剪逐一尝试 jsQR。
+  // 截图里 QR 占比大，520 即可命中；相机照片动辄 4000px 宽、QR 只占一小块，
+  // 必须提高采样分辨率或裁掉边缘，否则缩采样后码点太小解不出来。
+  async function decodeImageMulti(source){
+    try {
+      var d = getDetector();
+      if (d){
+        var res = await d.detect(source);
+        if (res && res.length) return res[0].rawValue;
+      }
+    } catch (e){}
+    var scales = [
+      { maxSide: 520 },                // 快速路径：截图（与旧行为一致）
+      { maxSide: 1600 },               // 相机整图，高分辨率采样
+      { crop: 0.6, maxSide: 1200 },    // 中心 60% 裁剪
+      { crop: 0.4, maxSide: 900 },     // 中心 40% 裁剪（QR 拍得近、占满画面时）
+      { maxSide: 520, invert: true },  // 反色兜底（暗色主题的白码黑底）
+      { maxSide: 1200, mirror: true }, // 镜像兜底：选择器里的「相机」可能落到前置镜头
+      { maxSide: 520, mirror: true, invert: true }
+    ];
+    for (var i = 0; i < scales.length; i++){
+      var text = decodeWithJsQR(source, scales[i]);
+      if (text) return text;
+    }
+    return null;
   }
   // 图片源：优先 createImageBitmap，旧浏览器回退 <img>
   function loadImageSource(file){
@@ -1476,28 +1514,133 @@ if (typeof module !== 'undefined' && module.exports){
     if (scanStream){ scanStream.getTracks().forEach(function(t){ t.stop(); }); scanStream = null; }
   }
 
-  $('btn-scan').addEventListener('click', async function(){
+  // 部分国产 WebView（小米浏览器、微信 X5）对相机约束解析有 bug，允权后仍可能失败；
+  // 降级链见 openCamera：ideal 后置 → 朴素请求复核 → 枚举 deviceId 找后置 → 兜底默认。
+  var GUM_DENIED = { NotAllowedError: 1, SecurityError: 1, PermissionDeniedError: 1 };
+  async function openCamera(){
+    var md = navigator.mediaDevices;
+    var canFace = false;   // 能力探测：约束不被支持时跳过，少走一步弯路
+    try { canFace = !!(md.getSupportedConstraints && md.getSupportedConstraints().facingMode); } catch (e){}
+    try {
+      // 显式 ideal（语义与裸写等价，但部分国产内核对裸写解析有 bug）
+      return await md.getUserMedia({ video: canFace ? { facingMode: { ideal: 'environment' } } : true });
+    } catch (e){
+      // 复核：部分国产内核会把「约束解析失败」伪装成 NotAllowedError ——
+      // 用最朴素的 { video: true } 再试一次，能过就是假阳性；复核错误也最接近真实原因
+      try {
+        return await md.getUserMedia({ video: true });
+      } catch (e2){
+        e = e2;
+      }
+      // 此刻授权已通过、label 可读：按标签认后置，用 deviceId 精确打开（绕开内核约束处理）
+      if (md.enumerateDevices && !(e && GUM_DENIED[e.name])){
+        var devs = [];
+        try { devs = await md.enumerateDevices(); } catch (e3){}
+        var back = null;
+        for (var i = 0; i < devs.length; i++){
+          if (devs[i].kind === 'videoinput' && /back|rear|后/i.test(devs[i].label || '')){ back = devs[i]; break; }
+        }
+        if (back && back.deviceId){
+          try { return await md.getUserMedia({ video: { deviceId: { exact: back.deviceId } } }); } catch (e4){}
+        }
+      }
+      throw e;
+    }
+  }
+
+  // 权限被拒：网页弹窗的「允许」只是浏览器层授权，系统层/应用内权限是另一道闸。
+  // 微信、小米浏览器 UA 各有特征，按环境给出对应路径的指引，比一闪而过的 toast 有用。
+  function isWechat(){ return /MicroMessenger/i.test(navigator.userAgent); }
+  function isMiBrowser(){ return /MiuiBrowser|MiBrowser|Xiaomi/i.test(navigator.userAgent); }
+  // 扫码失败后的自动退让：轻量过渡框，一次点击调起系统相机（文件选择必须由真实点击触发，
+  // 不能代点）。详细权限排查与诊断收进角落入口，留给愿意折腾的人。
+  function showPhotoFallback(err){
+    openModal(
+      '<h3>' + t('scan.photoTitle') + '</h3>' +
+      '<div class="tip" style="text-align:left">' + t('scan.photoTip') + '</div>' +
+      '<div class="foot"><button class="btn primary" id="scan-photo">' + t('btn.camera') + '</button>' +
+      '<button class="btn" id="scan-cancel">' + t('btn.cancel') + '</button></div>' +
+      '<div style="text-align:center;margin:-8px 0 10px"><button id="scan-help" class="btn sm ghost">' + t('scan.photoMore') + '</button></div>'
+    );
+    $('scan-photo').onclick = function(){ $('camera-input').click(); };
+    $('scan-cancel').onclick = closeModal;
+    $('scan-help').onclick = function(){ showDeniedHelp(err); };
+  }
+  function showDeniedHelp(gumErr){
+    var body = isWechat() ? t('scan.deniedWechat')
+             : isMiBrowser() ? t('scan.deniedMiui')
+             : t('scan.deniedGeneric');
+    openModal(
+      '<h3>' + t('scan.deniedTitle') + '</h3>' +
+      '<div class="tip" style="text-align:left">' + body + '</div>' +
+      '<div class="tip" style="text-align:left">' + t('scan.deniedAlt') + '</div>' +
+      '<div class="tip" id="scan-diag" style="text-align:left;opacity:.72;font-size:12px"></div>' +
+      '<div class="foot"><button class="btn primary" id="scan-retry">' + t('btn.retry') + '</button>' +
+      '<button class="btn" id="scan-close">' + t('btn.close') + '</button></div>'
+    );
+    $('scan-retry').onclick = startScan;
+    $('scan-close').onclick = closeModal;
+    renderScanDiag($('scan-diag'), gumErr);
+  }
+
+  // 诊断：内核 / 网页层权限状态 / 摄像头标签可见性 / 失败错误名 —— 用于区分
+  // 「网页层没放开」「App 没有系统相机权限」（Chromium 同样报 NotAllowedError）与「内核故障」
+  async function renderScanDiag(el, gumErr){
+    if (!el) return;
+    var parts = [], ua = navigator.userAgent || '';
+    var m = /Chrome\/([\d.]+)/.exec(ua);
+    parts.push(t('diag.kernel') + ': ' + (m ? 'Chromium ' + m[1] : ua.slice(0, 48)));
+    try {
+      var st = await navigator.permissions.query({ name: 'camera' });
+      var state = (st && st.state) || '';
+      var label = state === 'granted' ? t('diag.perm_granted')
+                : state === 'denied' ? t('diag.perm_denied')
+                : state === 'prompt' ? t('diag.perm_prompt')
+                : t('diag.perm_unknown');
+      parts.push(t('diag.permState') + ': ' + label);
+    } catch (e){ parts.push(t('diag.permState') + ': N/A'); }
+    try {
+      var devs = await navigator.mediaDevices.enumerateDevices();
+      var cams = 0, named = 0;
+      for (var i = 0; i < devs.length; i++){
+        if (devs[i].kind === 'videoinput'){ cams++; if (devs[i].label) named++; }
+      }
+      parts.push(t('diag.camCount') + ': ' + cams + '（' + (named ? t('diag.labelsShown') : t('diag.labelsHidden')) + '）');
+    } catch (e){}
+    if (gumErr && gumErr.name) parts.push(t('diag.errName') + ': ' + gumErr.name);
+    el.textContent = t('diag.label') + ' | ' + parts.join(' · ');
+  }
+
+  async function startScan(){
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
       toast(t('toast.noCamera')); return;
     }
+    var stream = null;
+    try {
+      stream = await openCamera();   // 先拿流：离用户点击最近，也避免弹窗先闪再失败
+    } catch (e){
+      showPhotoFallback(e); return;  // 扫码不可用 → 自动退让到拍照，不把权限排查甩给用户
+    }
     openModal(
       '<h3>' + t('scan.title') + '</h3>' +
-      '<video id="scan-video" autoplay muted playsinline></video>' +
+      '<video id="scan-video" autoplay muted playsinline webkit-playsinline></video>' +
       '<div class="tip">' + t('scan.tip') + '</div>' +
       '<div class="foot"><button class="btn" id="scan-cancel">' + t('btn.cancel') + '</button></div>'
     );
     var video = $('scan-video');
     $('scan-cancel').onclick = function(){ stopScan(); closeModal(); };
+    scanStream = stream;
+    video.muted = true;   // 部分 WebView 需显式置 muted 属性，脚本播放才被放行
+    video.srcObject = scanStream;
     try {
-      scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      video.srcObject = scanStream;
       await video.play();
     } catch (e){
-      stopScan(); closeModal();
-      toast(t('toast.cameraFailed', {
-        reason: (e && e.name === 'NotAllowedError') ? t('err.permissionDenied') : ((e && e.message) || t('err.unknown'))
-      }));
-      return;
+      // 自动播放被策略拦截（微信/X5 常见，await getUserMedia 后用户手势已失效）：
+      // 流已就绪，保留画面，等用户轻触后再播放，而不是直接关窗
+      toast(t('toast.tapToPlay'));
+      var resume = function(){ video.play().catch(function(){}); };
+      video.addEventListener('click', resume, { once: true });
+      video.addEventListener('touchend', resume, { once: true });
     }
     (function loop(){
       scanTimer = setTimeout(async function(){
@@ -1509,26 +1652,31 @@ if (typeof module !== 'undefined' && module.exports){
         loop();
       }, 220);
     })();
-  });
+  }
+  $('btn-scan').addEventListener('click', function(){ startScan(); });
 
   $('btn-pick').addEventListener('click', function(){
     $('file-input').click();
   });
-  $('file-input').addEventListener('change', async function(e){
+  // 拍照按钮已并入扫码的自动退让（showPhotoFallback），camera-input 仍由那里调起
+  // 「图片」与退让拍照共用同一条识别管线：拿文件 → loadImageSource → decodeImageMulti
+  async function handleImageFile(e){
     var file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
     toast(t('toast.detecting'));
     try {
       var src = await loadImageSource(file);
-      var text = await detectQr(src);
+      var text = await decodeImageMulti(src);
       if (src && src.close) src.close();
       if (text) onDetected(text);
-      else toast(t('toast.noQrFound'));
+      else toast(t('toast.noQrFound', { w: (src && src.width) || 0, h: (src && src.height) || 0 }));
     } catch (err){
       toast(t('toast.imageFailed', { msg: (err && err.message) || t('err.unknown') }));
     }
-  });
+  }
+  $('file-input').addEventListener('change', handleImageFile);
+  $('camera-input').addEventListener('change', handleImageFile);
 
   /* ---------- 语言切换 ---------- */
   // 只打了一种语言包时（如 --lang=zh 单语构建）没有可切换的目标，直接隐藏按钮
