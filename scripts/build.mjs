@@ -141,6 +141,18 @@ if (!html.includes(I18N_PLACEHOLDER)) {
 html = html.replace(I18N_PLACEHOLDER, packs);
 console.log('已注入语言包:', LANGS.join(', '));
 
+// 版本号单一来源：JSON-LD 的 softwareVersion 在源码里用 __APP_VERSION__ 占位，
+// 构建时从 package.json 注入，避免「漏改源码版本」导致与包版本不一致。
+const pkgVersion = (() => {
+  try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version; } catch (e) { return ''; }
+})();
+if (!pkgVersion) throw new Error('未能从 package.json 读取 version');
+if (!html.includes('__APP_VERSION__')) {
+  throw new Error('index.html 的 JSON-LD 未使用 __APP_VERSION__ 占位（版本由构建从 package.json 注入）');
+}
+html = html.replace(/__APP_VERSION__/g, pkgVersion);
+console.log('已注入软件版本（来自 package.json）:', pkgVersion);
+
 if (minify) {
   const t0 = Date.now();
   html = await minifyHtml(html);

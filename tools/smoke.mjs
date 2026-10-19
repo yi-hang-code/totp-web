@@ -554,9 +554,12 @@ check('两份 README 章节数一致', (zhDoc.match(/^## /gm) || []).length === 
 /* --- 18. 版本号：package.json 与页面 JSON-LD 的 softwareVersion 必须同步 --- */
 // 版本号散在两处，漏改会让搜索引擎读到的版本与包版本不一致，这里强制对齐
 const pkg = (() => { try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')); } catch (e) { return {}; } })();
-const ldVersion = (srcHtml.match(/"softwareVersion"\s*:\s*"([^"]+)"/) || [])[1] || '';
 check('版本号为 semver 三段式', /^\d+\.\d+\.\d+$/.test(String(pkg.version)), String(pkg.version));
-check('package.json 与页面 JSON-LD 版本号一致', !!pkg.version && pkg.version === ldVersion, `pkg ${pkg.version} / html ${ldVersion}`);
+// 单一来源：源码 JSON-LD 用 __APP_VERSION__ 占位，版本由构建从 package.json 注入，
+// 因此源码不再硬编码版本，从根上避免「漏改」导致与包版本不一致。
+check('源码 JSON-LD 版本由构建从 package.json 注入（不硬编码）',
+  srcHtml.includes('"softwareVersion": "__APP_VERSION__"'),
+  '应为 __APP_VERSION__ 占位');
 check('构建产物里的 JSON-LD 版本号同步', html.includes('"softwareVersion":"' + pkg.version + '"') || html.includes('"softwareVersion": "' + pkg.version + '"'), String(pkg.version));
 
 console.error = origErr;

@@ -119,12 +119,12 @@ npm test         # = build + verify + smoke + i18n-check
 **发版：**
 
 ```bash
-# 1. 改 package.json 的 version 并提交（页面 JSON-LD 的 softwareVersion 要同步）
+# 1. 改 package.json 的 version 并提交（页面 JSON-LD 的 softwareVersion 由构建从 package.json 自动注入，无需手动同步）
 # 2. 打同名 tag 并推送
 git tag v1.1.0 && git push origin v1.1.0
 ```
 
-tag 与 `package.json` 版本不一致时流水线会直接失败，避免 `package.json` / 页面 JSON-LD / Release tag 三处脱节。
+tag 与 `package.json` 版本不一致时流水线会直接失败，避免 `package.json` / 页面 JSON-LD / Release tag 三处脱节。JSON-LD 版本是构建时从 `package.json` 注入的，所以只要改这一处即可。
 
 ---
 

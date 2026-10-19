@@ -119,12 +119,12 @@ The repository ships three pipelines:
 **Releasing:**
 
 ```bash
-# 1. bump "version" in package.json (and softwareVersion in the JSON-LD) and commit
+# 1. bump "version" in package.json and commit (the JSON-LD softwareVersion is injected from package.json at build time — no manual sync needed)
 # 2. push a matching tag
 git tag v1.1.0 && git push origin v1.1.0
 ```
 
-The release pipeline fails if the tag and `package.json` disagree, so `package.json`, the JSON-LD `softwareVersion` and the Release tag cannot drift apart.
+The release pipeline fails if the tag and `package.json` disagree, so `package.json`, the JSON-LD `softwareVersion` and the Release tag cannot drift apart. The JSON-LD version is injected from `package.json` at build time, so bumping that one field is sufficient.
 
 ---
 
