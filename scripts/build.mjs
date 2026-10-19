@@ -20,6 +20,7 @@
  *     __I18N_PACKS__ 占位，构建时按需注入（默认 zh,en；--lang=zh 只打一种）。
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -149,3 +150,23 @@ if (minify) {
 mkdirSync(outDir, { recursive: true });
 writeFileSync(outHtml, html);
 console.log('已生成 dist/index.html', '(' + lib.length + ' bytes jsQR' + (minify ? ' + 压缩' : '') + ')');
+
+// —— CSP hash 白名单：单文件应用的全部 JS 都内联，静态托管无法用 nonce（需逐请求
+// 生成响应头），标准做法是对每个内联 <script> 的内容算 SHA-256。产物任何字节变化
+// 都会使 hash 失效，因此头文件随每次构建重新生成，与 index.html 严格配对部署。
+function cspValue(h) {
+  return "default-src 'self'; script-src 'self' " + h.join(' ') +
+    "; style-src 'self' 'unsafe-inline'" +   // CSS 无法执行脚本；页面用内联 style 属性，收紧需 unsafe-hashes 得不偿失
+    "; img-src 'self' data: blob:" +         // blob: 是「图片」识别兜底路径（loadViaImg）的硬需求
+    "; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'" +
+    "; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests";
+}
+const scriptHashes = [];
+const scriptRe = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+let sm;
+while ((sm = scriptRe.exec(html))) {
+  scriptHashes.push("'sha256-" + createHash('sha256').update(sm[1], 'utf8').digest('base64') + "'");
+}
+if (!scriptHashes.length) throw new Error('产物中没有内联 <script>，CSP 头无法生成');
+writeFileSync(join(outDir, 'csp-header.txt'), 'Content-Security-Policy "' + cspValue(scriptHashes) + '"\n');
+console.log('已生成 dist/csp-header.txt（内联脚本 SHA-256 ×' + scriptHashes.length + '，与本次 dist/index.html 配对使用）');
