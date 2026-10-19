@@ -346,8 +346,13 @@ check('存在 CSP meta', !!csp);
 const cspVal = csp ? csp[1] : '';
 check('CSP 禁止一切对外连接', /connect-src 'none'/.test(cspVal), cspVal);
 check('CSP 禁止外部脚本/样式', /script-src 'unsafe-inline'/.test(cspVal) && /style-src 'unsafe-inline'/.test(cspVal));
-check('CSP 防点击劫持', /frame-ancestors 'none'/.test(cspVal));
+// frame-ancestors 在 <meta> 里被浏览器忽略（只认 HTTP 头），写进去只会在控制台告警，
+// 所以这里断言它「不在」meta 中，同时确认其余防护仍然齐全。
+check('CSP 不含被 meta 忽略的 frame-ancestors', !/frame-ancestors/.test(cspVal), cspVal);
 check('CSP 禁止 base 注入', /base-uri 'none'/.test(cspVal));
+check('CSP 禁止插件类嵌入', /object-src 'none'/.test(cspVal));
+// PWA：标准写法 mobile-web-app-capable 必须存在（apple- 前缀版已废弃）
+check('PWA 使用标准 mobile-web-app-capable', /name="mobile-web-app-capable" content="yes"/.test(html));
 check('禁用 referrer 泄露', /name="referrer" content="no-referrer"/.test(html));
 // 所有拼进 innerHTML 的动态值必须经过 escapeHtml
 const appSrc = html.slice(html.indexOf('<script id="app">'), html.indexOf('</script>', html.indexOf('<script id="app">')));
@@ -406,6 +411,11 @@ check('引导面板内只有 1 个设置主密码按钮',
   [...g0('onboard-panel').querySelectorAll('button')].length === 1,
   String([...g0('onboard-panel').querySelectorAll('button')].length));
 check('引导状态下隐藏空状态', g0('empty').classList.contains('hidden'));
+// 引导页含 {{min}} 插值文案：必须被替换成实际分钟数，不能把占位符漏到界面上
+const li3 = g0('onboard-panel').querySelector('[data-i18n="onboard.li3"]');
+check('引导页「闲置 N 分钟」已插值（无 {{min}} 残留）',
+  !!li3 && !/\{\{/.test(li3.textContent) && /5/.test(li3.textContent),
+  li3 ? li3.textContent : '(未找到 li3)');
 
 g0('btn-onboard-set').click();
 await sleep(80);
@@ -482,6 +492,11 @@ const zhLeftover = collectText(doc.body, [])
   .filter((s) => s && /[\u4e00-\u9fff]/.test(s))
   .map((s) => s.slice(0, 40));
 check('切英文后无中文残留（含 title/placeholder）', zhLeftover.length === 0, zhLeftover.slice(0, 6).join(' | '));
+// 切语言后静态文案要重新插值，不能残留 {{min}}
+const li3En = $('onboard-panel').querySelector('[data-i18n="onboard.li3"]');
+check('切英文后「闲置 N 分钟」同样已插值',
+  !!li3En && !/\{\{/.test(li3En.textContent) && /after 5 minutes/i.test(li3En.textContent),
+  li3En ? li3En.textContent : '(未找到 li3)');
 
 $('btn-lang').click();
 await sleep(150);

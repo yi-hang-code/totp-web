@@ -4,8 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <!-- 纵深防御：页面无任何外部资源，禁止一切对外连接与外链脚本。
-     即使将来出现注入点，也无法把数据发送到任何地方（connect-src 'none'）。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'" />
+     即使将来出现注入点，也无法把数据发送到任何地方（connect-src 'none'）。
+     注意：frame-ancestors（防点击劫持）在 <meta> 里会被浏览器忽略，只能通过
+     HTTP 响应头下发，写在这里只会产生控制台告警，故不列入。需要该防护时
+     请在服务端/托管平台配置 Content-Security-Policy: frame-ancestors 'none'。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'" />
 <meta name="referrer" content="no-referrer" />
   <title>TOTP-Web · 纯前端 TOTP 身份验证器（离线 / 开源 / 零网络）</title>
   <meta name="description" content="TOTP-Web 是一个纯浏览器前端的 TOTP（RFC 6238）身份验证器：多账户管理、二维码扫描、主密码（PBKDF2 + AES-GCM）加密本地存储。所有计算在本机完成，零网络、可离线、MIT 开源，Secret 永不离开你的设备。" />
@@ -15,6 +18,8 @@
   <meta name="theme-color" content="#2563eb" />
   <meta name="color-scheme" content="light dark" />
   <meta name="application-name" content="TOTP-Web" />
+  <!-- mobile-web-app-capable 是标准写法；apple- 前缀那版已废弃，保留仅为兼容旧版 iOS Safari -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="TOTP-Web" />
   <meta property="og:type" content="website" />
@@ -437,16 +442,26 @@ function t(key, vars) {
   return val;
 }
 
-function applyI18n() {
+function applyI18n(vars) {
+  // vars: 可选的插值变量表，供带 {{var}} 的静态文案使用（如 onboard.li3 的 {{min}}）
+  // 合并 window.__i18nVars：app 侧注册的全局变量表（IDLE_LOCK_MS 等运行时值），
+  // 这样 setLocale() 内部那次 applyI18n() 也能拿到变量。
+  var shared = window.__i18nVars || null;
+  if (shared) {
+    var merged = {}, k;
+    for (k in shared) merged[k] = shared[k];
+    if (vars) for (k in vars) merged[k] = vars[k];
+    vars = merged;
+  }
   var i, nodes, v;
   nodes = document.querySelectorAll('[data-i18n]');
-  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n')); nodes[i].textContent = v; }
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n'), vars); nodes[i].textContent = v; }
   nodes = document.querySelectorAll('[data-i18n-html]');
-  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-html')); nodes[i].innerHTML = v; }
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-html'), vars); nodes[i].innerHTML = v; }
   nodes = document.querySelectorAll('[data-i18n-ph]');
-  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-ph')); nodes[i].setAttribute('placeholder', v); }
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-ph'), vars); nodes[i].setAttribute('placeholder', v); }
   nodes = document.querySelectorAll('[data-i18n-title]');
-  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-title')); nodes[i].setAttribute('title', v); }
+  for (i = 0; i < nodes.length; i++) { v = t(nodes[i].getAttribute('data-i18n-title'), vars); nodes[i].setAttribute('title', v); }
   var lb = document.getElementById('btn-lang');
   if (lb){
     var avail = [];
@@ -472,6 +487,8 @@ function setLocale(l) {
 LOCALE = detectLocale();
 document.documentElement.lang = I18N_LANG[LOCALE] || LOCALE;
 document.title = t('app.title');
+// 兜底默认值：app 脚本启动时会用真实 IDLE_LOCK_MS 覆盖，避免引导页残留 {{min}}
+window.__i18nVars = { min: 5 };
 </script>
 
 <script id="core-lib">
@@ -867,6 +884,9 @@ if (typeof module !== 'undefined' && module.exports){
   // locked: 处于加密但未解锁
   var state = { accounts: [], mode: 'plain', locked: false, cryptoKey: null, encMeta: null, hasStoredData: false };
   var IDLE_LOCK_MS = 5 * 60 * 1000;   // 闲置自动锁定
+  // 供 applyI18n 插值用的运行时变量（静态文案里的 {{min}} 等）
+  // 必须在 applyI18n() 首次调用之前注册，否则引导页那行会残留占位符
+  window.__i18nVars = { min: Math.round(IDLE_LOCK_MS / 60000) };
   var lastActivity = Date.now();
   var cards = new Map();     // id -> {el, code, bar, sec, counter}
 
